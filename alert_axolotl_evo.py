@@ -239,7 +239,7 @@ def fitness(tree: Any, seed: int, gen: int) -> float:
         window = values[start : idx + 1]
         data = {"latency": window}
         result = evaluate(tree, data)
-        alerting = result is not None
+        alerting = isinstance(result, str)
         if anomalies[idx] and alerting:
             tp += 1
         if anomalies[idx] and not alerting:
@@ -257,6 +257,10 @@ def fitness(tree: Any, seed: int, gen: int) -> float:
     score = f_beta * possible_tp
     if "avg" in str(tree):
         score += 1.0
+    if "avg" in str(tree) and ">" in str(tree):
+        score += 1.5
+    if fp > 40:
+        score -= 5.0
     penalty = 0.005 * len(str(tree))
     return score - penalty
 

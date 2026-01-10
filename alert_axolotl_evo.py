@@ -115,23 +115,37 @@ def coerce_number(value: Any) -> float:
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, list):
-        return FUNCTIONS["avg"](value)
+        numeric = [coerce_number(item) for item in value if item is not None]
+        return FUNCTIONS["avg"](numeric)
     return 0.0
 
 
-def evaluate(tree: Any, data: Dict[str, Any]) -> Any:
+def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
     """Recursively evaluate a tree."""
+    if isinstance(tree, list):
+        return [_evaluate(item, data) for item in tree]
     if isinstance(tree, tuple):
+        if not tree:
+            return None
         op = tree[0]
         if op == "if_alert":
+            if len(tree) != 3:
+                return None
             cond = evaluate(tree[1], data)
             msg = evaluate(tree[2], data)
             return ALERT(bool(cond), msg)
         if op == "avg":
+            if len(tree) != 2:
+                return None
             vals = evaluate(tree[1], data)
-            if not isinstance(vals, list):
-                vals = [coerce_number(vals)]
-            return FUNCTIONS[op](vals)
+            if isinstance(vals, list):
+                numeric = [coerce_number(item) for item in vals]
+                return FUNCTIONS[op](numeric)
+            return FUNCTIONS[op]([coerce_number(vals)])
+        if op not in (">", "<", "and", "or"):
+            return None
+        if len(tree) != 3:
+            return None
         left = evaluate(tree[1], data)
         right = evaluate(tree[2], data)
         if op in (">", "<"):
@@ -141,6 +155,14 @@ def evaluate(tree: Any, data: Dict[str, Any]) -> Any:
     if isinstance(tree, str) and tree in data:
         return data[tree]
     return tree
+
+
+def evaluate(tree: Any, data: Dict[str, Any]) -> Any:
+    """Recursively evaluate a tree."""
+    try:
+        return _evaluate(tree, data)
+    except Exception:
+        return None
 
 
 def print_ascii_tree(tree: Any, prefix: str = "", is_last: bool = True) -> str:
@@ -223,14 +245,34 @@ def tournament_select(scored: List[Tuple[Any, float]], size: int = 4) -> Any:
     return contenders[0][0]
 
 
+ARITIES = {"if_alert": 2, "avg": 1, ">": 2, "<": 2, "and": 2, "or": 2}
+
+
+def is_valid_subtree(tree: Any) -> bool:
+    if not isinstance(tree, tuple):
+        return True
+    if not tree:
+        return False
+    op = tree[0]
+    if op not in ARITIES:
+        return False
+    if len(tree) - 1 != ARITIES[op]:
+        return False
+    return all(is_valid_subtree(child) for child in tree[1:])
+
+
 def subtree_crossover(parent_a: Any, parent_b: Any) -> Tuple[Any, Any]:
     """Swap random subtrees between two parents."""
-    paths_a = get_subtree_paths(parent_a)
-    paths_b = get_subtree_paths(parent_b)
+    paths_a = [(path, subtree) for path, subtree in get_subtree_paths(parent_a) if is_valid_subtree(subtree)]
+    paths_b = [(path, subtree) for path, subtree in get_subtree_paths(parent_b) if is_valid_subtree(subtree)]
+    if not paths_a or not paths_b:
+        return parent_a, parent_b
     path_a, subtree_a = random.choice(paths_a)
     path_b, subtree_b = random.choice(paths_b)
     child_a = replace_subtree(parent_a, path_a, subtree_b)
     child_b = replace_subtree(parent_b, path_b, subtree_a)
+    if not is_valid_subtree(child_a) or not is_valid_subtree(child_b):
+        return parent_a, parent_b
     return child_a, child_b
 
 
@@ -259,13 +301,19 @@ def announce_birth(tree: Any) -> None:
     logging.getLogger("evo").info("A new beast awakens: %s (hash:%s)", name, tree_hash(tree))
 
 
+def select_top_bottom(trees: Sequence[Any], count: int = 3) -> List[Any]:
+    if len(trees) <= count * 2:
+        return list(trees)
+    return list(trees[:count]) + list(trees[-count:])
+
+
 def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
     """Main evolution loop."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     random.seed(seed)
 
     population = initialize_population(pop_size, 2, 7)
-    for tree in population:
+    for tree in select_top_bottom(population):
         announce_birth(tree)
 
     for gen in range(generations):
@@ -286,7 +334,7 @@ def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
 
         elites_count = max(1, int(0.1 * pop_size))
         elites = [tree for tree, _ in scored[:elites_count]]
-        for tree, _ in scored[elites_count:]:
+        for tree, _ in scored[elites_count:][-3:]:
             log_funeral(tree, gen)
 
         next_population = elites[:]
@@ -304,7 +352,7 @@ def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
             next_population.extend([child_a, child_b])
 
         population = next_population[:pop_size]
-        for tree in population:
+        for tree in select_top_bottom(population):
             announce_birth(tree)
 
     logging.getLogger("evo").info("Evolution complete. The fittest guardian survives... for now. 🌱💀🐉")

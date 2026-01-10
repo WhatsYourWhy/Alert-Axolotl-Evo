@@ -71,6 +71,11 @@ def random_function() -> str:
 
 def grow_tree(depth: int, max_depth: int) -> Any:
     """Grow method: choose function or terminal stochastically."""
+    if depth == 0 and random.random() < 0.4:
+        avg_subtree = ("avg", grow_tree(depth + 1, max_depth))
+        if random.random() < 0.5:
+            return avg_subtree
+        return ("if_alert", avg_subtree, random_terminal())
     if depth >= max_depth or (depth > 0 and random.random() < 0.5):
         return random_terminal()
     func = random_function()
@@ -83,6 +88,11 @@ def grow_tree(depth: int, max_depth: int) -> Any:
 
 def full_tree(depth: int, max_depth: int) -> Any:
     """Full method: always expand until max_depth."""
+    if depth == 0 and random.random() < 0.4:
+        avg_subtree = ("avg", full_tree(depth + 1, max_depth))
+        if random.random() < 0.5:
+            return avg_subtree
+        return ("if_alert", avg_subtree, random_terminal())
     if depth >= max_depth:
         return random_terminal()
     func = random_function()
@@ -222,7 +232,7 @@ def generate_mock_data(seed: int, size: int = 100) -> Tuple[List[float], List[bo
 def fitness(tree: Any, seed: int, gen: int) -> float:
     """Compute fitness based on detection quality and parsimony."""
     values, anomalies = generate_mock_data(seed + gen)
-    tp = fp = 0
+    tp = fp = fn = 0
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
@@ -232,10 +242,23 @@ def fitness(tree: Any, seed: int, gen: int) -> float:
         alerting = result is not None
         if anomalies[idx] and alerting:
             tp += 1
+        if anomalies[idx] and not alerting:
+            fn += 1
         if not anomalies[idx] and alerting:
             fp += 1
+    possible_tp = 8
+    tp_rate = tp / possible_tp
+    fp_rate = fp / possible_tp
+    fn_rate = fn / possible_tp
+    beta = 0.5
+    beta_sq = beta**2
+    denom = (1 + beta_sq) * tp_rate + beta_sq * fn_rate + fp_rate
+    f_beta = ((1 + beta_sq) * tp_rate / denom) if denom else 0.0
+    score = f_beta * possible_tp
+    if "avg" in str(tree):
+        score += 1.0
     penalty = 0.005 * len(str(tree))
-    return tp - 2 * fp - penalty
+    return score - penalty
 
 
 def tournament_select(scored: List[Tuple[Any, float]], size: int = 4) -> Any:
@@ -316,17 +339,20 @@ def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
     for tree in select_top_bottom(population):
         announce_birth(tree)
 
+    champion = None
+    champ_fit = 0.0
     for gen in range(generations):
         logging.getLogger("evo").info("\n=== Generation %s ===", gen)
         scored = []
         for tree in population:
             fit = fitness(tree, seed, gen)
-            name = generate_name(tree)
-            logging.getLogger("evo").info("%s faces the anomaly horde... fitness %.2f", name, fit)
             scored.append((tree, fit))
 
         scored.sort(key=lambda item: (-item[1], node_count(item[0])))
         champion, champ_fit = scored[0]
+        for tree, fit in scored[:3]:
+            name = generate_name(tree)
+            logging.getLogger("evo").info("%s faces the anomaly horde... fitness %.2f", name, fit)
         logging.getLogger("evo").info("→ 🐉 ROARS VICTORIOUSLY!")
         print(print_ascii_tree(champion))
         if champ_fit > 0.9:
@@ -334,7 +360,7 @@ def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
 
         elites_count = max(1, int(0.1 * pop_size))
         elites = [tree for tree, _ in scored[:elites_count]]
-        for tree, _ in scored[elites_count:][-3:]:
+        for tree, _ in scored[elites_count:][-2:]:
             log_funeral(tree, gen)
 
         next_population = elites[:]
@@ -355,6 +381,11 @@ def evolve(seed: int = 42, pop_size: int = 50, generations: int = 40) -> None:
         for tree in select_top_bottom(population):
             announce_birth(tree)
 
+    final_name = generate_name(champion)
+    logging.getLogger("evo").info("\nFinal Champion: %s", final_name)
+    logging.getLogger("evo").info("Final Champion Tree: %s", champion)
+    logging.getLogger("evo").info("Final Champion Fitness: %.2f", champ_fit)
+    print(print_ascii_tree(champion))
     logging.getLogger("evo").info("Evolution complete. The fittest guardian survives... for now. 🌱💀🐉")
 
 

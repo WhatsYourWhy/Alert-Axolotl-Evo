@@ -1,0 +1,24 @@
+evolution:
+  seed: 42
+  pop_size: 50
+  generations: 40
+  min_depth: 2
+  max_depth: 7
+  elite_ratio: 0.1
+
+operators:
+  crossover_rate: 0.9
+  mutation_rate: 0.2
+  tournament_size: 4
+
+fitness:
+  beta: 0.5
+  bloat_penalty: 0.005
+  fp_threshold: 40
+  fp_penalty: 5.0
+
+data:
+  mock_size: 100
+  anomaly_count: 8
+  anomaly_multiplier: 2.5
+

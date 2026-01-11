@@ -2,6 +2,13 @@
 
 Alert Axolotl Evo is a deterministic, gamified genetic programming system that evolves alert rules expressed as nested tuples. It generates a population of alert-rule trees, evaluates them against data (mock or real), and narrates an over-the-top evolution loop with ASCII trees, dramatic logs, and playful names.
 
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation
+- **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
+- **[examples/fun_examples.md](examples/fun_examples.md)**: Fun gamification examples
+- **[examples/output_sample.txt](examples/output_sample.txt)**: Sample evolution output
+
 ## Features
 
 - **Tree-based alert rules**: Programs are nested tuples like `('if_alert', ('>', ('avg', 'latency'), 100), 'High ping!')`
@@ -257,6 +264,10 @@ Load data from JSON file.
 
 #### `create_data_loader(config)`
 Factory function to create appropriate DataLoader from DataConfig.
+
+## Archived Files
+
+The original single-file implementation (`alert_axolotl_evo.py`) has been moved to the `archive/` directory. See `archive/README.md` for details. The new modular package is the recommended approach, but `alert_axolotl_evo_legacy.py` provides backward compatibility.
 
 ## Contributing
 

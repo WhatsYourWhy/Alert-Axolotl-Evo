@@ -1,0 +1,116 @@
+Alert Axolotl Evo - Sample Evolution Output
+============================================
+
+This file shows example output from a typical evolution run, showcasing the
+gamified narratives, champion announcements, and funeral logs.
+
+---
+
+A new beast awakens: Guardian Gremlin (hash:a3f2c1)
+A new beast awakens: Alert Axolotl (hash:b4e3d2)
+A new beast awakens: Siren Salamander (hash:c5f4e3)
+A new beast awakens: Chaos Critter (hash:d6g5h4)
+A new beast awakens: Whispering Watcher (hash:e7h6i5)
+A new beast awakens: Guardian Gremlin (hash:f8i7j6)
+
+=== Generation 0 ===
+Spikezilla the Threshold Tyrant faces the anomaly horde... fitness 8.45
+Guardian Gremlin faces the anomaly horde... fitness 7.23
+Smoothie the Eternal Averager faces the anomaly horde... fitness 6.12
+→ 🐉 ROARS VICTORIOUSLY!
+└─ if_alert
+   ├─ >
+   │  ├─ avg
+   │  │  └─ latency
+   │  └─ 100
+   └─ High alert!
+
+💥⚡🌟🔥 *CRASH* Anomaly detected! 🌟🔥⚡💥
+
+RIP Bloaty McRedundantface (hash:g9j8k7) [gen 0]
+Cause of demise: terminal bloat
+Last words: ('if_alert', ('and', ('>', ('avg', 'latency'), 100), ('<', ('avg'...
+Trash-talk: 'Maybe try being useful next time.'
+
+RIP Chaos Critter (hash:h0k9l8) [gen 0]
+Cause of demise: false-alarm fever
+Last words: ('if_alert', ('>', 'latency', 50), 'Danger zone!')
+Trash-talk: 'Maybe try being useful next time.'
+
+A new beast awakens: Spikezilla the Threshold Tyrant (hash:a3f2c1)
+A new beast awakens: Guardian Gremlin (hash:m1l0m9)
+A new beast awakens: Alert Axolotl (hash:n2m1n0)
+
+=== Generation 1 ===
+Spikezilla the Threshold Tyrant faces the anomaly horde... fitness 8.67
+Guardian Gremlin faces the anomaly horde... fitness 7.89
+Alert Axolotl faces the anomaly horde... fitness 7.45
+→ 🐉 ROARS VICTORIOUSLY!
+└─ if_alert
+   ├─ >
+   │  ├─ avg
+   │  │  └─ latency
+   │  └─ 100
+   └─ High alert!
+
+RIP Whispering Watcher (hash:o3n2o1) [gen 1]
+Cause of demise: overfitted hubris
+Last words: ('if_alert', ('and', ('>', ('avg', 'latency'), 100), ('>', ('avg'...
+Trash-talk: 'Maybe try being useful next time.'
+
+RIP Siren Salamander (hash:p4o3p2) [gen 1]
+Cause of demise: anomaly blindness
+Last words: ('if_alert', ('<', ('avg', 'latency'), 50), 'High alert!')
+Trash-talk: 'Maybe try being useful next time.'
+
+=== Generation 2 ===
+Spikezilla the Threshold Tyrant faces the anomaly horde... fitness 8.89
+Smoothie the Eternal Averager faces the anomaly horde... fitness 8.12
+Guardian Gremlin faces the anomaly horde... fitness 7.98
+→ 🐉 ROARS VICTORIOUSLY!
+└─ if_alert
+   ├─ >
+   │  ├─ avg
+   │  │  └─ latency
+   │  └─ 100
+   └─ High alert!
+
+💥⚡🌟🔥 *CRASH* Anomaly detected! 🌟🔥⚡💥
+
+[... evolution continues ...]
+
+=== Generation 39 ===
+Spikezilla the Threshold Tyrant faces the anomaly horde... fitness 9.23
+Smoothie the Eternal Averager faces the anomaly horde... fitness 8.95
+Guardian Gremlin faces the anomaly horde... fitness 8.78
+→ 🐉 ROARS VICTORIOUSLY!
+└─ if_alert
+   ├─ >
+   │  ├─ avg
+   │  │  └─ latency
+   │  └─ 100
+   └─ High alert!
+
+💥⚡🌟🔥 *CRASH* Anomaly detected! 🌟🔥⚡💥
+
+Final Champion: Spikezilla the Threshold Tyrant
+Final Champion Tree: ('if_alert', ('>', ('avg', 'latency'), 100), 'High alert!')
+Final Champion Fitness: 9.23
+└─ if_alert
+   ├─ >
+   │  ├─ avg
+   │  │  └─ latency
+   │  └─ 100
+   └─ High alert!
+
+Evolution complete. The fittest guardian survives... for now. 🌱💀🐉
+
+---
+
+NOTES:
+- Champion names are deterministically generated from tree structure
+- Funerals are logged for the bottom performers each generation
+- ASCII trees visualize the evolved alert rules
+- Fitness scores reflect detection quality (TP/FP/FN) with parsimony pressure
+- The system maintains its gamified charm while being production-ready
+

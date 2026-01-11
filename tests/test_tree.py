@@ -25,7 +25,7 @@ def test_tree_hash():
 def test_node_count():
     """Test node counting."""
     tree1 = ("if_alert", (">", ("avg", "latency"), 100), "High alert!")
-    assert node_count(tree1) == 5
+    assert node_count(tree1) == 6  # if_alert, >, avg, latency, 100, "High alert!"
     
     tree2 = "latency"
     assert node_count(tree2) == 1

@@ -19,16 +19,28 @@ from alert_axolotl_evo.pattern_discovery import (
     suggest_new_primitives,
 )
 from alert_axolotl_evo.persistence import load_rule
+from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS, register_function, register_terminal
 
 
 class SelfImprovingEvolver:
     """Wrapper around evolution that learns from results and improves itself."""
     
-    def __init__(self, results_dir: Path = Path("evolution_results")):
+    def __init__(
+        self,
+        results_dir: Path = Path("evolution_results"),
+        auto_register: bool = True,
+        adapt_data: bool = True,
+        min_pattern_usage: int = 5,
+    ):
         self.results_dir = results_dir
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.history: List[Dict[str, Any]] = []
         self.learned_config: Optional[Config] = None
+        self.registered_primitives: List[str] = []
+        self.data_adaptations: List[Dict[str, Any]] = []
+        self.auto_register = auto_register
+        self.adapt_data = adapt_data
+        self.min_pattern_usage = min_pattern_usage
     
     def run_and_learn(self, config: Config, run_id: str) -> Dict[str, Any]:
         """
@@ -41,12 +53,25 @@ class SelfImprovingEvolver:
         Returns:
             Result dictionary with fitness and metadata
         """
-        # Run evolution
+        # Auto-register primitives before evolution (if enabled and we have history)
+        if self.auto_register and len(self.history) >= 2:
+            registered = self.auto_register_primitives()
+            if registered:
+                # Track registered primitives
+                self.registered_primitives.extend(registered)
+        
+        # Adapt data generation (if enabled)
+        if self.adapt_data:
+            adapted_config = self.adapt_data_generation(config)
+        else:
+            adapted_config = config
+        
+        # Run evolution with adapted config
         output_file = self.results_dir / f"{run_id}_champion.json"
         checkpoint_file = self.results_dir / f"checkpoint_{run_id}.json"
         
         evolve(
-            config=config,
+            config=adapted_config,
             export_rule_path=output_file,
             save_checkpoint_path=checkpoint_file,
         )
@@ -55,7 +80,7 @@ class SelfImprovingEvolver:
         result = load_rule(output_file)
         run_data = {
             "run_id": run_id,
-            "config": config.to_dict(),
+            "config": adapted_config.to_dict(),
             "fitness": result["fitness"],
             "generation": result["generation"],
             "rule_complexity": result["metadata"]["node_count"],
@@ -114,6 +139,158 @@ class SelfImprovingEvolver:
             self.learned_config.operators.tournament_size = int(
                 self.learned_config.operators.tournament_size * 0.7 + avg_tournament * 0.3
             )
+    
+    def auto_register_primitives(self, min_usage: Optional[int] = None) -> List[str]:
+        """
+        Automatically register new primitives based on discovered patterns.
+        
+        Args:
+            min_usage: Minimum pattern occurrence count to trigger registration
+                      (defaults to self.min_pattern_usage)
+        
+        Returns:
+            List of newly registered primitive names
+        """
+        if min_usage is None:
+            min_usage = self.min_pattern_usage
+        
+        if not self.results_dir.exists():
+            return []
+        
+        registered = []
+        patterns = discover_common_patterns(self.results_dir)
+        combinations = patterns.get("common_combinations", {})
+        
+        # Register common function combinations
+        combination_mappings = {
+            "avg+>": ("avg_gt", lambda vals, threshold: sum(vals) / len(vals) > threshold if vals else False, 2),
+            "avg+<": ("avg_lt", lambda vals, threshold: sum(vals) / len(vals) < threshold if vals else False, 2),
+            "max+>": ("max_gt", lambda vals, threshold: max(vals) > threshold if vals else False, 2),
+            "min+<": ("min_lt", lambda vals, threshold: min(vals) < threshold if vals else False, 2),
+        }
+        
+        for pattern_key, (prim_name, func, arity) in combination_mappings.items():
+            pattern_count = combinations.get(pattern_key, 0)
+            if pattern_count >= min_usage and prim_name not in FUNCTIONS:
+                if prim_name not in self.registered_primitives:
+                    register_function(prim_name, func, arity)
+                    registered.append(prim_name)
+        
+        # Register common thresholds as terminals
+        thresholds = patterns.get("common_thresholds", {})
+        if thresholds and hasattr(thresholds, 'most_common'):
+            common_thresholds = [
+                (t, count) for t, count in thresholds.most_common(5)
+                if count >= min_usage
+            ]
+            for threshold, _ in common_thresholds:
+                if threshold not in TERMINALS:
+                    if f"threshold_{threshold}" not in self.registered_primitives:
+                        register_terminal(threshold)
+                        registered.append(f"threshold_{threshold}")
+        
+        return registered
+    
+    def adapt_data_generation(self, config: Config) -> Config:
+        """
+        Adapt data generation parameters based on learned patterns.
+        
+        Args:
+            config: Configuration to adapt
+            
+        Returns:
+            Modified config with adapted data parameters (original not mutated)
+        """
+        # Only adapt mock data, never modify real data configs
+        if config.data.data_source != "mock":
+            return config
+        
+        if not self.results_dir.exists() or len(self.history) < 2:
+            return config
+        
+        # Create a copy to avoid mutating original
+        import copy
+        adapted_config = copy.deepcopy(config)
+        
+        patterns = discover_common_patterns(self.results_dir)
+        thresholds = patterns.get("common_thresholds", {})
+        
+        # Calculate fitness trend
+        if len(self.history) >= 3:
+            recent_fitness = [r["fitness"] for r in self.history[-3:]]
+            fitness_trend = recent_fitness[-1] - recent_fitness[0]
+        else:
+            fitness_trend = 0
+        
+        # Calculate average complexity
+        avg_complexity = sum(r["rule_complexity"] for r in self.history) / len(self.history)
+        
+        # Track what we're changing
+        changes = {}
+        
+        # Adaptation 1: If thresholds are clustered, make anomalies closer to threshold
+        if thresholds and hasattr(thresholds, 'most_common'):
+            top_thresholds = [t for t, _ in thresholds.most_common(3)]
+            if len(top_thresholds) >= 2:
+                threshold_range = max(top_thresholds) - min(top_thresholds)
+                if threshold_range < 50:  # Thresholds are clustered
+                    # Reduce anomaly_multiplier by 10-15% to bring anomalies closer
+                    reduction = 0.12  # 12% reduction
+                    new_multiplier = adapted_config.data.anomaly_multiplier * (1 - reduction)
+                    adapted_config.data.anomaly_multiplier = max(1.5, new_multiplier)  # Min 1.5x
+                    changes["anomaly_multiplier"] = {
+                        "old": config.data.anomaly_multiplier,
+                        "new": adapted_config.data.anomaly_multiplier,
+                        "reason": "Threshold clustering detected"
+                    }
+        
+        # Adaptation 2: If rules are too simple, increase data complexity
+        if avg_complexity < 5:
+            # Increase mock_size by 10-20%
+            increase = 0.15  # 15% increase
+            new_size = int(adapted_config.data.mock_size * (1 + increase))
+            adapted_config.data.mock_size = min(200, new_size)  # Max 200
+            changes["mock_size"] = {
+                "old": config.data.mock_size,
+                "new": adapted_config.data.mock_size,
+                "reason": "Low rule complexity"
+            }
+        
+        # Adaptation 3: If fitness is low, increase anomaly count
+        if len(self.history) > 0:
+            avg_fitness = sum(r["fitness"] for r in self.history) / len(self.history)
+            if avg_fitness < 3.0:
+                new_count = adapted_config.data.anomaly_count + 1
+                adapted_config.data.anomaly_count = min(15, new_count)  # Max 15
+                changes["anomaly_count"] = {
+                    "old": config.data.anomaly_count,
+                    "new": adapted_config.data.anomaly_count,
+                    "reason": "Low average fitness"
+                }
+        
+        # Adaptation 4: If fitness is plateauing, increase difficulty
+        if fitness_trend < 0.1 and len(self.history) >= 3:
+            # Increase anomaly_multiplier by 5-10%
+            increase = 0.075  # 7.5% increase
+            new_multiplier = adapted_config.data.anomaly_multiplier * (1 + increase)
+            adapted_config.data.anomaly_multiplier = min(4.0, new_multiplier)  # Max 4.0x
+            if "anomaly_multiplier" not in changes:
+                changes["anomaly_multiplier"] = {
+                    "old": config.data.anomaly_multiplier,
+                    "new": adapted_config.data.anomaly_multiplier,
+                    "reason": "Fitness plateauing"
+                }
+            else:
+                changes["anomaly_multiplier"]["reason"] += "; Fitness plateauing"
+        
+        # Track the adaptation
+        if changes:
+            self.data_adaptations.append({
+                "run_id": len(self.history),
+                "changes": changes,
+            })
+        
+        return adapted_config
     
     def suggest_improvements(self) -> List[str]:
         """
@@ -228,6 +405,8 @@ class SelfImprovingEvolver:
                 for prim, stats in list(primitive_usage.items())[:10]
             },
             "suggestions": self.suggest_improvements(),
+            "auto_registered_primitives": self.registered_primitives,
+            "data_adaptations": self.data_adaptations[-5:],  # Last 5 adaptations
         }
         
         return report

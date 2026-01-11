@@ -100,7 +100,12 @@ def evolve(
             name = generate_name(tree)
             logging.getLogger("evo").info("%s faces the anomaly horde... fitness %.2f", name, fit)
         logging.getLogger("evo").info("→ 🐉 ROARS VICTORIOUSLY!")
-        print(print_ascii_tree(champion))
+        try:
+            tree_output = print_ascii_tree(champion)
+            print(tree_output)
+        except UnicodeEncodeError:
+            # Fallback for Windows console encoding issues
+            logging.getLogger("evo").info("Champion tree: %s", champion)
         if champ_fit > 0.9:
             logging.getLogger("evo").info("💥⚡🌟🔥 *CRASH* Anomaly detected! 🌟🔥⚡💥")
         
@@ -144,7 +149,12 @@ def evolve(
     logging.getLogger("evo").info("\nFinal Champion: %s", final_name)
     logging.getLogger("evo").info("Final Champion Tree: %s", champion)
     logging.getLogger("evo").info("Final Champion Fitness: %.2f", champ_fit)
-    print(print_ascii_tree(champion))
+    try:
+        tree_output = print_ascii_tree(champion)
+        print(tree_output)
+    except UnicodeEncodeError:
+        # Fallback for Windows console encoding issues
+        logging.getLogger("evo").info("Final Champion Tree: %s", champion)
     
     # Export rule if requested
     if export_rule_path:

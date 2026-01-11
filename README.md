@@ -6,6 +6,7 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
+- **[USAGE.md](USAGE.md)**: Practical usage guide and real-world examples
 - **[examples/fun_examples.md](examples/fun_examples.md)**: Fun gamification examples
 - **[examples/output_sample.txt](examples/output_sample.txt)**: Sample evolution output
 
@@ -42,6 +43,15 @@ pip install -e ".[yaml]"
 - Optional: PyYAML (for YAML config files)
 
 ## Quick Start
+
+### Try the Demo
+
+```bash
+# Run a quick 5-generation demo to see it in action!
+python demo.py
+```
+
+This showcases the gamified evolution with fun names, champion battles, and funeral logs.
 
 ### Basic Usage
 

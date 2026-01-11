@@ -8,6 +8,7 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
 - **[USAGE.md](USAGE.md)**: Practical usage guide and real-world examples
 - **[META_EVOLUTION.md](META_EVOLUTION.md)**: Meta-evolution and self-improving system guide
+- **[RESULTS.md](RESULTS.md)**: Meta-evolution experiment results and discoveries
 - **[examples/fun_examples.md](examples/fun_examples.md)**: Fun gamification examples
 - **[examples/output_sample.txt](examples/output_sample.txt)**: Sample evolution output
 

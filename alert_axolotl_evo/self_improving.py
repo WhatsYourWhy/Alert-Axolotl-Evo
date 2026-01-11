@@ -206,14 +206,25 @@ class SelfImprovingEvolver:
         patterns = discover_common_patterns(self.results_dir)
         primitive_usage = analyze_primitive_usage(self.results_dir)
         
+        # Convert Counter objects to serializable dicts
+        top_functions = patterns.get("common_functions", {})
+        top_combinations = patterns.get("common_combinations", {})
+        
+        # Convert config_performance keys to strings if needed
+        serializable_config_perf = {}
+        if config_performance:
+            for k, v in config_performance.items():
+                key = str(k) if not isinstance(k, (str, int, float, bool)) or k is None else k
+                serializable_config_perf[key] = v
+        
         report = {
             "metrics": metrics,
             "successful_configs": successful_configs,
-            "config_performance": config_performance,
-            "top_functions": dict(patterns.get("common_functions", {}).most_common(5)),
-            "top_combinations": dict(patterns.get("common_combinations", {}).most_common(5)),
+            "config_performance": serializable_config_perf,
+            "top_functions": dict(top_functions.most_common(5)) if hasattr(top_functions, 'most_common') else {},
+            "top_combinations": {str(k): v for k, v in top_combinations.most_common(5)} if hasattr(top_combinations, 'most_common') else {},
             "primitive_effectiveness": {
-                prim: stats["avg_fitness"] 
+                str(prim): stats["avg_fitness"] 
                 for prim, stats in list(primitive_usage.items())[:10]
             },
             "suggestions": self.suggest_improvements(),

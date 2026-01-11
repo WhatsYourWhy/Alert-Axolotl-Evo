@@ -236,6 +236,100 @@ Rules are nested tuples that can be:
 5. **Checkpointing**: Save checkpoints for long runs
 6. **Validation**: Test evolved rules on holdout data
 
+## Meta-Evolution: Evolving Better Evolution
+
+### What is Meta-Evolution?
+
+Meta-evolution uses the evolution system itself to find optimal evolution parameters. It treats configurations (pop_size, mutation_rate, etc.) as genomes and evolves them.
+
+### Basic Meta-Evolution
+
+```python
+from alert_axolotl_evo.meta_evolution import MetaEvolver
+from alert_axolotl_evo.config import Config
+
+base_config = Config()
+meta_evolver = MetaEvolver(
+    base_config=base_config,
+    pop_size=10,  # Meta-population size
+    generations=5,  # Meta-generations
+    eval_generations=10,  # Generations per evaluation
+)
+
+# Evolve better config
+best_genome = meta_evolver.evolve_configs()
+optimal_config = best_genome.to_config(base_config)
+
+# Use optimal config for actual evolution
+from alert_axolotl_evo.evolution import evolve
+evolve(config=optimal_config)
+```
+
+### Self-Improving Evolution
+
+The self-improving wrapper learns from each run:
+
+```python
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.config import Config
+
+evolver = SelfImprovingEvolver(results_dir=Path("results"))
+config = Config()
+
+# Run multiple times - system learns and improves
+for i in range(5):
+    config = evolver.get_optimal_config(config)  # Gets learned optimal config
+    result = evolver.run_and_learn(config, f"run_{i}")
+    print(f"Run {i}: Fitness {result['fitness']:.2f}")
+
+# Get improvement suggestions
+suggestions = evolver.suggest_improvements()
+for suggestion in suggestions:
+    print(f"- {suggestion}")
+
+# Get performance report
+report = evolver.get_performance_report()
+print(f"Average fitness: {report['metrics']['avg_fitness']:.2f}")
+```
+
+### Pattern Discovery
+
+Analyze evolved rules to discover patterns:
+
+```python
+from alert_axolotl_evo.pattern_discovery import (
+    discover_common_patterns,
+    suggest_new_primitives,
+    analyze_primitive_usage,
+)
+
+patterns = discover_common_patterns(Path("results"))
+suggestions = suggest_new_primitives(patterns)
+usage = analyze_primitive_usage(Path("results"))
+
+print("Top functions:", patterns["common_functions"].most_common(5))
+print("Suggestions:", suggestions)
+```
+
+### Analytics
+
+Track and analyze evolution performance:
+
+```python
+from alert_axolotl_evo.analytics import (
+    analyze_evolution_results,
+    track_performance_metrics,
+    identify_successful_configs,
+)
+
+results = analyze_evolution_results(Path("results"))
+metrics = track_performance_metrics(results)
+best_configs = identify_successful_configs(results, top_n=3)
+
+print(f"Average fitness: {metrics['avg_fitness']:.2f}")
+print(f"Best config: {best_configs[0]}")
+```
+
 ## Troubleshooting
 
 ### Low Fitness Scores
@@ -243,6 +337,7 @@ Rules are nested tuples that can be:
 - Increase population size
 - Run more generations
 - Adjust fitness parameters in config
+- Try meta-evolution to find optimal parameters
 
 ### Rules Too Complex
 - Increase bloat penalty in config
@@ -254,4 +349,6 @@ Rules are nested tuples that can be:
 - Check data quality
 - Try different seeds
 - Verify data loader is working
+- Use meta-evolution to optimize parameters
+- Use self-improving mode to learn from runs
 

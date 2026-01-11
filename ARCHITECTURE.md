@@ -402,6 +402,89 @@ All config values can be overridden via CLI arguments.
 }
 ```
 
+## Meta-Evolution System
+
+### Overview
+
+The meta-evolution system creates a recursive self-improvement mechanism where the evolution process itself evolves to become better at evolving.
+
+### Components
+
+#### `analytics.py`
+- **Performance Tracking**: Analyzes evolution results and tracks metrics
+- **Config Analysis**: Identifies successful configurations
+- **Convergence Analysis**: Measures how fast evolution converges
+
+#### `pattern_discovery.py`
+- **Pattern Analysis**: Discovers common patterns in evolved rules
+- **Primitive Suggestions**: Suggests new primitives based on usage
+- **Optimization Targets**: Identifies code optimization opportunities
+
+#### `meta_evolution.py`
+- **ConfigGenome**: Represents configuration as a genome
+- **MetaEvolver**: Evolves better evolution parameters
+- **Config Evaluation**: Tests configurations by running evolution
+
+#### `self_improving.py`
+- **SelfImprovingEvolver**: Wrapper that learns from each run
+- **Automatic Tuning**: Adjusts config based on successful runs
+- **Improvement Suggestions**: Recommends system improvements
+
+### Meta-Evolution Flow
+
+```
+1. Initialize Meta-Evolution
+   └─> Create population of ConfigGenomes
+
+2. Meta-Evolution Loop
+   ├─> Evaluate Each ConfigGenome
+   │   └─> Run evolution with config → get fitness
+   ├─> Select Best Configs
+   ├─> Crossover & Mutate Configs
+   └─> Next Generation
+
+3. Use Best Config
+   └─> Run actual evolution with optimal config
+```
+
+### Self-Improving Flow
+
+```
+1. Run Evolution
+   └─> Save results to results_dir
+
+2. Analyze Results
+   ├─> Track performance metrics
+   ├─> Identify successful configs
+   └─> Discover patterns
+
+3. Learn & Improve
+   ├─> Update learned optimal config
+   ├─> Generate improvement suggestions
+   └─> Tune parameters automatically
+
+4. Next Run
+   └─> Use learned config for better results
+```
+
+### Usage Example
+
+```python
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.config import Config
+
+evolver = SelfImprovingEvolver()
+config = Config()
+
+# Run multiple times, learning each time
+for i in range(5):
+    config = evolver.get_optimal_config(config)  # Use learned config
+    evolver.run_and_learn(config, f"run_{i}")
+
+# Get suggestions
+suggestions = evolver.suggest_improvements()
+```
+
 ## Future Enhancements
 
 - Parallel fitness evaluation
@@ -412,4 +495,6 @@ All config values can be overridden via CLI arguments.
 - More statistical functions
 - Time-series specific operators
 - Rule explanation/interpretability
+- Meta-evolution for fitness function parameters
+- Automated primitive discovery and registration
 

@@ -2,6 +2,39 @@
 
 All notable changes to Alert-Axolotl-Evo will be documented in this file.
 
+## [1.1.0] - 2026-01-11
+
+### Added
+- **Meta-Evolution System**: Evolve better evolution parameters automatically
+  - `meta_evolution.py`: Evolves configurations as genomes
+  - `ConfigGenome`: Represents configuration as evolvable genome
+  - `MetaEvolver`: Evolves better evolution parameters
+- **Self-Improving System**: System learns from each run
+  - `self_improving.py`: Wrapper that learns and improves automatically
+  - `SelfImprovingEvolver`: Tracks history and tunes config automatically
+  - Improvement suggestions based on patterns
+- **Analytics Module**: Track and analyze evolution performance
+  - `analytics.py`: Performance metrics, config analysis, convergence tracking
+  - Performance reports and insights
+- **Pattern Discovery**: Analyze evolved rules for patterns
+  - `pattern_discovery.py`: Discover common patterns, suggest primitives
+  - Primitive usage analysis and effectiveness scoring
+- **CLI Integration**: Meta-evolution and self-improving modes
+  - `--meta-evolve`: Run meta-evolution to find optimal config
+  - `--self-improving`: Use self-improving evolver
+  - `--performance-report`: Generate performance analysis
+- **Example Scripts**: 
+  - `examples/meta_evolution_example.py`: Meta-evolution demo
+  - `examples/self_improving_example.py`: Self-improving demo
+- **Tests**: Comprehensive tests for new modules
+  - `tests/test_analytics.py`
+  - `tests/test_meta_evolution.py`
+  - `tests/test_self_improving.py`
+
+### Changed
+- `main.py`: Added meta-evolution and self-improving CLI options
+- `__init__.py`: Exported new meta-evolution modules
+
 ## [1.0.0] - 2026-01-11
 
 ### Added

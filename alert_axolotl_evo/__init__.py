@@ -13,6 +13,18 @@ from alert_axolotl_evo.primitives import (
 )
 from alert_axolotl_evo.config import Config, load_config
 from alert_axolotl_evo.persistence import load_rule, save_rule
+from alert_axolotl_evo.meta_evolution import MetaEvolver, ConfigGenome
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.analytics import (
+    analyze_evolution_results,
+    track_performance_metrics,
+    identify_successful_configs,
+)
+from alert_axolotl_evo.pattern_discovery import (
+    discover_common_patterns,
+    suggest_new_primitives,
+    analyze_primitive_usage,
+)
 
 __all__ = [
     "evolve",
@@ -30,5 +42,14 @@ __all__ = [
     "load_config",
     "load_rule",
     "save_rule",
+    "MetaEvolver",
+    "ConfigGenome",
+    "SelfImprovingEvolver",
+    "analyze_evolution_results",
+    "track_performance_metrics",
+    "identify_successful_configs",
+    "discover_common_patterns",
+    "suggest_new_primitives",
+    "analyze_primitive_usage",
 ]
 

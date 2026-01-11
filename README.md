@@ -7,6 +7,7 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
 - **[USAGE.md](USAGE.md)**: Practical usage guide and real-world examples
+- **[META_EVOLUTION.md](META_EVOLUTION.md)**: Meta-evolution and self-improving system guide
 - **[examples/fun_examples.md](examples/fun_examples.md)**: Fun gamification examples
 - **[examples/output_sample.txt](examples/output_sample.txt)**: Sample evolution output
 
@@ -87,6 +88,15 @@ python -m alert_axolotl_evo.main --load-checkpoint checkpoint.json
 
 # Export final champion rule
 python -m alert_axolotl_evo.main --export-rule champion.json
+
+# Meta-evolution: Evolve better evolution parameters
+python -m alert_axolotl_evo.main --meta-evolve --meta-generations 5
+
+# Self-improving mode: Learn from each run
+python -m alert_axolotl_evo.main --self-improving --results-dir results/
+
+# Generate performance report
+python -m alert_axolotl_evo.main --performance-report
 ```
 
 ## Configuration
@@ -204,6 +214,40 @@ print(rule_data["tree"])
 print(rule_data["fitness"])
 ```
 
+### Meta-Evolution: Evolving Better Evolution
+
+```python
+from alert_axolotl_evo.meta_evolution import MetaEvolver
+from alert_axolotl_evo.config import Config
+
+# Evolve optimal evolution parameters
+base_config = Config()
+meta_evolver = MetaEvolver(base_config=base_config, pop_size=10, generations=5)
+best_genome = meta_evolver.evolve_configs()
+optimal_config = best_genome.to_config(base_config)
+
+# Use optimal config
+evolve(config=optimal_config)
+```
+
+### Self-Improving Evolution
+
+```python
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.config import Config
+
+# System learns from each run
+evolver = SelfImprovingEvolver()
+config = Config()
+
+for i in range(5):
+    config = evolver.get_optimal_config(config)  # Gets learned optimal config
+    evolver.run_and_learn(config, f"run_{i}")
+
+# Get improvement suggestions
+suggestions = evolver.suggest_improvements()
+```
+
 ### Extending Primitives
 
 ```python
@@ -230,6 +274,10 @@ alert_axolotl_evo/
 ├── visualization.py        # ASCII trees, narratives
 ├── data.py                # Data loading
 ├── persistence.py         # Save/load rules
+├── analytics.py           # Performance analytics
+├── pattern_discovery.py   # Pattern analysis
+├── meta_evolution.py      # Meta-evolution core
+├── self_improving.py      # Self-improving wrapper
 └── main.py                # Entry point
 
 tests/
@@ -237,7 +285,10 @@ tests/
 ├── test_fitness.py
 ├── test_operators.py
 ├── test_evolution.py
-└── test_data.py
+├── test_data.py
+├── test_analytics.py
+├── test_meta_evolution.py
+└── test_self_improving.py
 ```
 
 ## Testing
@@ -274,6 +325,31 @@ Load data from JSON file.
 
 #### `create_data_loader(config)`
 Factory function to create appropriate DataLoader from DataConfig.
+
+### Meta-Evolution
+
+#### `MetaEvolver(base_config, pop_size, generations)`
+Evolves better evolution parameters.
+
+#### `ConfigGenome(pop_size, mutation_rate, crossover_rate, tournament_size, elite_ratio)`
+Represents a configuration as a genome for meta-evolution.
+
+#### `SelfImprovingEvolver(results_dir)`
+Wrapper that learns from evolution runs and improves automatically.
+
+### Analytics
+
+#### `analyze_evolution_results(results_dir)`
+Analyze evolution results from checkpoint and rule files.
+
+#### `track_performance_metrics(results)`
+Track performance metrics from evolution results.
+
+#### `discover_common_patterns(rules_dir)`
+Discover common patterns in evolved rules.
+
+#### `suggest_new_primitives(patterns)`
+Suggest new primitives based on discovered patterns.
 
 ## Archived Files
 

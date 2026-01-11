@@ -174,10 +174,49 @@ class TimeSeriesDataLoader(DataLoader):
                 self.path,
                 self.value_column,
                 self.timestamp_column,
-                self.anomaly_key,
+                self.anomaly_column,
             )
         else:
             raise ValueError(f"Unsupported file format: {self.path.suffix}")
         
         return loader.load()
+
+
+def create_data_loader(config) -> DataLoader:
+    """
+    Create a DataLoader from config.
+    
+    Args:
+        config: DataConfig instance
+        
+    Returns:
+        DataLoader instance
+    """
+    if config.data_source == "mock":
+        return MockDataLoader(
+            seed=42,  # Will be overridden per generation
+            size=config.mock_size,
+            anomaly_count=config.anomaly_count,
+            anomaly_multiplier=config.anomaly_multiplier,
+        )
+    elif config.data_source == "csv":
+        if not config.data_path:
+            raise ValueError("data_path must be specified for CSV data source")
+        return CSVDataLoader(
+            config.data_path,
+            config.value_column,
+            config.timestamp_column,
+            config.anomaly_column,
+        )
+    elif config.data_source == "json":
+        if not config.data_path:
+            raise ValueError("data_path must be specified for JSON data source")
+        return JSONDataLoader(
+            config.data_path,
+            config.value_column,
+            config.timestamp_column,
+            config.anomaly_column,
+        )
+    else:
+        raise ValueError(f"Unknown data source: {config.data_source}")
 

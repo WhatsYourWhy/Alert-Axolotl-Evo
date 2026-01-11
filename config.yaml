@@ -18,6 +18,11 @@ fitness:
   fp_penalty: 5.0
 
 data:
+  data_source: mock  # "mock", "csv", or "json"
+  data_path: null  # Path to data file (for csv/json)
+  value_column: value  # Column/key name for values
+  timestamp_column: timestamp  # Column/key name for timestamps
+  anomaly_column: null  # Column/key name for anomaly labels (optional)
   mock_size: 100
   anomaly_count: 8
   anomaly_multiplier: 2.5

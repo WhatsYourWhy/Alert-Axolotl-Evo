@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple
 
 from alert_axolotl_evo.config import Config
+from alert_axolotl_evo.data import DataLoader, create_data_loader
 from alert_axolotl_evo.fitness import fitness
 from alert_axolotl_evo.operators import (
     initialize_population,
@@ -45,6 +46,19 @@ def evolve(
     
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     
+    # Create data loader
+    try:
+        data_loader = create_data_loader(config.data)
+    except Exception as e:
+        logging.getLogger("evo").warning(f"Failed to create data loader: {e}. Using mock data.")
+        from alert_axolotl_evo.data import MockDataLoader
+        data_loader = MockDataLoader(
+            seed=seed,
+            size=config.data.mock_size,
+            anomaly_count=config.data.anomaly_count,
+            anomaly_multiplier=config.data.anomaly_multiplier,
+        )
+    
     # Load checkpoint if provided
     start_gen = 0
     champion_history: List[Tuple[Any, float]] = []
@@ -72,7 +86,7 @@ def evolve(
         logging.getLogger("evo").info("\n=== Generation %s ===", gen)
         scored = []
         for tree in population:
-            fit = fitness(tree, seed, gen, config.fitness, config.data)
+            fit = fitness(tree, seed, gen, config.fitness, config.data, data_loader)
             scored.append((tree, fit))
 
         scored.sort(key=lambda item: (-item[1], node_count(item[0])))

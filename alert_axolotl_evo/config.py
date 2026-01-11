@@ -38,6 +38,12 @@ class FitnessConfig:
 @dataclass
 class DataConfig:
     """Data generation/loading parameters."""
+    data_source: str = "mock"  # "mock", "csv", "json"
+    data_path: Optional[Path] = None
+    value_column: str = "value"  # For CSV/JSON
+    timestamp_column: str = "timestamp"  # For CSV/JSON
+    anomaly_column: Optional[str] = None  # For CSV/JSON
+    # Mock data parameters
     mock_size: int = 100
     anomaly_count: int = 8
     anomaly_multiplier: float = 2.5
@@ -62,7 +68,11 @@ class Config:
         if "fitness" in data:
             config.fitness = FitnessConfig(**data["fitness"])
         if "data" in data:
-            config.data = DataConfig(**data["data"])
+            data_dict = data["data"].copy()
+            # Convert data_path string to Path if present
+            if "data_path" in data_dict and data_dict["data_path"]:
+                data_dict["data_path"] = Path(data_dict["data_path"])
+            config.data = DataConfig(**data_dict)
         return config
 
     @classmethod
@@ -111,6 +121,11 @@ class Config:
                 "fp_penalty": self.fitness.fp_penalty,
             },
             "data": {
+                "data_source": self.data.data_source,
+                "data_path": str(self.data.data_path) if self.data.data_path else None,
+                "value_column": self.data.value_column,
+                "timestamp_column": self.data.timestamp_column,
+                "anomaly_column": self.data.anomaly_column,
                 "mock_size": self.data.mock_size,
                 "anomaly_count": self.data.anomaly_count,
                 "anomaly_multiplier": self.data.anomaly_multiplier,
@@ -148,6 +163,10 @@ def add_config_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--crossover-rate", type=float, help="Crossover rate")
     parser.add_argument("--mutation-rate", type=float, help="Mutation rate")
     parser.add_argument("--tournament-size", type=int, help="Tournament size")
+    parser.add_argument("--data-source", type=str, choices=["mock", "csv", "json"], help="Data source type")
+    parser.add_argument("--data-path", type=Path, help="Path to data file (for csv/json)")
+    parser.add_argument("--value-column", type=str, help="Column/key name for values")
+    parser.add_argument("--anomaly-column", type=str, help="Column/key name for anomaly labels")
     return parser
 
 
@@ -169,5 +188,13 @@ def merge_cli_args(config: Config, args: argparse.Namespace) -> Config:
         config.operators.mutation_rate = args.mutation_rate
     if args.tournament_size is not None:
         config.operators.tournament_size = args.tournament_size
+    if args.data_source is not None:
+        config.data.data_source = args.data_source
+    if args.data_path is not None:
+        config.data.data_path = args.data_path
+    if args.value_column is not None:
+        config.data.value_column = args.value_column
+    if args.anomaly_column is not None:
+        config.data.anomaly_column = args.anomaly_column
     return config
 

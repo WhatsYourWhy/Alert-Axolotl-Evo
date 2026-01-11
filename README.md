@@ -54,6 +54,9 @@ python -m alert_axolotl_evo.main --config config.yaml
 
 # Override specific parameters
 python -m alert_axolotl_evo.main --seed 123 --generations 50 --pop-size 100
+
+# Use real data from CSV/JSON
+python -m alert_axolotl_evo.main --data-source csv --data-path data.csv --value-column latency --anomaly-column is_anomaly
 ```
 
 ### Advanced Usage
@@ -216,7 +219,8 @@ tests/
 ├── test_tree.py
 ├── test_fitness.py
 ├── test_operators.py
-└── test_evolution.py
+├── test_evolution.py
+└── test_data.py
 ```
 
 ## Testing
@@ -250,6 +254,9 @@ Load data from CSV file.
 
 #### `JSONDataLoader(path, value_key, timestamp_key, anomaly_key)`
 Load data from JSON file.
+
+#### `create_data_loader(config)`
+Factory function to create appropriate DataLoader from DataConfig.
 
 ## Contributing
 

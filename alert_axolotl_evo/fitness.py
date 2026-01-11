@@ -4,6 +4,7 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from alert_axolotl_evo.config import DataConfig, FitnessConfig
+from alert_axolotl_evo.data import DataLoader, MockDataLoader
 from alert_axolotl_evo.primitives import ALERT, FUNCTIONS
 
 
@@ -126,6 +127,7 @@ def fitness(
     gen: int,
     fitness_config: Optional[FitnessConfig] = None,
     data_config: Optional[DataConfig] = None,
+    data_loader: Optional[DataLoader] = None,
 ) -> float:
     """Compute fitness based on detection quality and parsimony."""
     if fitness_config is None:
@@ -133,12 +135,20 @@ def fitness(
     if data_config is None:
         data_config = DataConfig()
     
-    values, anomalies = generate_mock_data(
-        seed + gen,
-        size=data_config.mock_size,
-        anomaly_count=data_config.anomaly_count,
-        anomaly_multiplier=data_config.anomaly_multiplier,
-    )
+    # Use provided data loader or create mock data
+    if data_loader is not None:
+        if isinstance(data_loader, MockDataLoader):
+            # Update seed for mock data loader
+            data_loader.seed = seed + gen
+        values, anomalies = data_loader.load()
+    else:
+        # Fallback to generate_mock_data for backward compatibility
+        values, anomalies = generate_mock_data(
+            seed + gen,
+            size=data_config.mock_size,
+            anomaly_count=data_config.anomaly_count,
+            anomaly_multiplier=data_config.anomaly_multiplier,
+        )
     tp = fp = fn = 0
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
@@ -153,7 +163,8 @@ def fitness(
             fn += 1
         if not anomalies[idx] and alerting:
             fp += 1
-    possible_tp = data_config.anomaly_count
+    # Calculate possible_tp from actual anomalies in data
+    possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
     fp_rate = fp / possible_tp if possible_tp > 0 else 0.0
     fn_rate = fn / possible_tp if possible_tp > 0 else 0.0

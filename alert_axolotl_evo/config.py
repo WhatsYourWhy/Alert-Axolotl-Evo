@@ -44,9 +44,18 @@ class DataConfig:
     timestamp_column: str = "timestamp"  # For CSV/JSON
     anomaly_column: Optional[str] = None  # For CSV/JSON
     # Mock data parameters
-    mock_size: int = 100
-    anomaly_count: int = 8
-    anomaly_multiplier: float = 2.5
+    mock_size: int = 1000  # Increased from 100 for more realistic dataset
+    anomaly_count: int = 50  # Increased proportionally (5% rate)
+    anomaly_multiplier: float = 1.8  # Reduced from 2.5 for harder detection
+    # Data consistency: if True, use same data across all generations
+    # If False, data changes per generation (seed + gen)
+    consistent_data: bool = True  # Default to True for proper learning
+    # Realistic data generation options
+    use_realistic_patterns: bool = True  # Enable trends, noise, realistic anomalies
+    base_latency_mean: float = 50.0  # Base latency mean
+    base_latency_std: float = 10.0  # Base latency std dev
+    trend_strength: float = 0.1  # Strength of gradual trends (0-1)
+    noise_level: float = 0.15  # Additional noise level (0-1)
 
 
 @dataclass

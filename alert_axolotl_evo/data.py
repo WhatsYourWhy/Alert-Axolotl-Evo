@@ -27,25 +27,47 @@ class DataLoader(ABC):
 
 
 class MockDataLoader(DataLoader):
-    """Generate deterministic mock latency data with anomalies."""
+    """
+    Generate deterministic mock latency data with anomalies.
+    
+    Supports both simple and realistic data generation modes.
+    """
     
     def __init__(
         self,
         seed: int = 42,
-        size: int = 100,
-        anomaly_count: int = 8,
-        anomaly_multiplier: float = 2.5,
+        size: int = 1000,
+        anomaly_count: int = 50,
+        anomaly_multiplier: float = 1.8,
+        use_realistic_patterns: bool = True,
+        base_latency_mean: float = 50.0,
+        base_latency_std: float = 10.0,
+        trend_strength: float = 0.1,
+        noise_level: float = 0.15,
     ):
         self.seed = seed
         self.size = size
         self.anomaly_count = anomaly_count
         self.anomaly_multiplier = anomaly_multiplier
+        self.use_realistic_patterns = use_realistic_patterns
+        self.base_latency_mean = base_latency_mean
+        self.base_latency_std = base_latency_std
+        self.trend_strength = trend_strength
+        self.noise_level = noise_level
     
     def load(self) -> Tuple[List[float], List[bool]]:
         """Generate mock data."""
         rng = random.Random(self.seed)
-        values = [rng.gauss(50, 10) for _ in range(self.size)]
-        anomaly_idx = set(rng.sample(range(self.size), self.anomaly_count))
+        
+        if self.use_realistic_patterns:
+            return self._generate_realistic_data(rng)
+        else:
+            return self._generate_simple_data(rng)
+    
+    def _generate_simple_data(self, rng: random.Random) -> Tuple[List[float], List[bool]]:
+        """Generate simple mock data (original method)."""
+        values = [rng.gauss(self.base_latency_mean, self.base_latency_std) for _ in range(self.size)]
+        anomaly_idx = set(rng.sample(range(self.size), min(self.anomaly_count, self.size)))
         anomalies = []
         for idx, value in enumerate(values):
             if idx in anomaly_idx:
@@ -53,6 +75,102 @@ class MockDataLoader(DataLoader):
                 anomalies.append(True)
             else:
                 anomalies.append(False)
+        return values, anomalies
+    
+    def _generate_realistic_data(self, rng: random.Random) -> Tuple[List[float], List[bool]]:
+        """
+        Generate realistic latency data with:
+        - Gradual trends (slow increases/decreases)
+        - Natural noise
+        - Realistic anomaly patterns (spikes, sustained high values, gradual increases)
+        - Baseline variation
+        """
+        values = []
+        anomalies = [False] * self.size
+        
+        # Generate baseline with trend
+        # Create a slow trend (e.g., gradual increase over time)
+        trend_direction = rng.choice([-1, 1])  # Up or down
+        trend_magnitude = rng.uniform(0.5, 1.5) * self.trend_strength
+        
+        for idx in range(self.size):
+            # Base value with trend
+            progress = idx / max(self.size - 1, 1)  # 0 to 1
+            trend_offset = trend_direction * trend_magnitude * progress * self.base_latency_mean
+            base_value = self.base_latency_mean + trend_offset
+            
+            # Add natural variation
+            value = rng.gauss(base_value, self.base_latency_std)
+            
+            # Add additional noise
+            noise = rng.gauss(0, self.base_latency_std * self.noise_level)
+            value += noise
+            
+            # Ensure non-negative
+            value = max(0.1, value)
+            values.append(value)
+        
+        # Create anomalies to reach exactly self.anomaly_count points
+        total_anomaly_points = 0
+        used_positions = set()
+        
+        while total_anomaly_points < self.anomaly_count:
+            # Choose a random position that hasn't been used
+            attempts = 0
+            pos = None
+            while attempts < 100:
+                candidate = rng.randint(0, self.size - 1)
+                if candidate not in used_positions:
+                    # Check spacing (min 3 apart)
+                    if not any(abs(candidate - p) < 3 for p in used_positions):
+                        pos = candidate
+                        break
+                attempts += 1
+            
+            if pos is None:
+                # Fallback: use any unused position
+                available = [i for i in range(self.size) if i not in used_positions]
+                if not available:
+                    break
+                pos = rng.choice(available)
+            
+            base_value = values[pos]
+            remaining = self.anomaly_count - total_anomaly_points
+            
+            # Choose anomaly type based on remaining count
+            if remaining == 1 or rng.random() < 0.6:
+                # Single-point anomaly (spike or multiplier)
+                if rng.random() < 0.7:
+                    multiplier = rng.uniform(1.5, 2.5)  # Spike
+                else:
+                    multiplier = rng.uniform(1.3, self.anomaly_multiplier)  # Simple multiplier
+                values[pos] = base_value * multiplier
+                anomalies[pos] = True
+                used_positions.add(pos)
+                total_anomaly_points += 1
+            else:
+                # Multi-point anomaly (sustained or gradual)
+                if rng.random() < 0.5:  # Sustained
+                    multiplier = rng.uniform(1.3, 1.8)
+                    duration = rng.randint(2, min(3, self.size - pos, remaining))
+                    for i in range(duration):
+                        if pos + i < self.size and total_anomaly_points < self.anomaly_count:
+                            values[pos + i] = values[pos + i] * multiplier
+                            anomalies[pos + i] = True
+                            used_positions.add(pos + i)
+                            total_anomaly_points += 1
+                else:  # Gradual
+                    peak_multiplier = rng.uniform(1.4, 2.0)
+                    duration = rng.randint(2, min(4, self.size - pos, remaining))
+                    for i in range(duration):
+                        if pos + i < self.size and total_anomaly_points < self.anomaly_count:
+                            progress = i / max(duration - 1, 1)
+                            multiplier = 1.0 + (peak_multiplier - 1.0) * progress
+                            values[pos + i] = values[pos + i] * multiplier
+                            anomalies[pos + i] = True
+                            used_positions.add(pos + i)
+                            total_anomaly_points += 1
+        
         return values, anomalies
 
 
@@ -278,10 +396,15 @@ def create_data_loader(config) -> DataLoader:
     """
     if config.data_source == "mock":
         return MockDataLoader(
-            seed=42,  # Will be overridden per generation
+            seed=42,  # Will be overridden per generation (or kept consistent if consistent_data=True)
             size=config.mock_size,
             anomaly_count=config.anomaly_count,
             anomaly_multiplier=config.anomaly_multiplier,
+            use_realistic_patterns=getattr(config, 'use_realistic_patterns', True),
+            base_latency_mean=getattr(config, 'base_latency_mean', 50.0),
+            base_latency_std=getattr(config, 'base_latency_std', 10.0),
+            trend_strength=getattr(config, 'trend_strength', 0.1),
+            noise_level=getattr(config, 'noise_level', 0.15),
         )
     elif config.data_source == "csv":
         if not config.data_path:

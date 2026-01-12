@@ -23,7 +23,13 @@ data:
   value_column: value  # Column/key name for values
   timestamp_column: timestamp  # Column/key name for timestamps
   anomaly_column: null  # Column/key name for anomaly labels (optional)
-  mock_size: 100
-  anomaly_count: 8
-  anomaly_multiplier: 2.5
+  mock_size: 1000  # Increased for more realistic dataset
+  anomaly_count: 50  # ~5% anomaly rate
+  anomaly_multiplier: 1.8  # Reduced for harder detection
+  consistent_data: true  # Use same data across all generations (recommended)
+  use_realistic_patterns: true  # Enable trends, noise, realistic anomalies
+  base_latency_mean: 50.0
+  base_latency_std: 10.0
+  trend_strength: 0.1  # Strength of gradual trends (0-1)
+  noise_level: 0.15  # Additional noise level (0-1)
 

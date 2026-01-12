@@ -188,7 +188,12 @@ def fitness_breakdown(
     # Use provided data loader or create mock data
     if data_loader is not None:
         if isinstance(data_loader, MockDataLoader):
-            data_loader.seed = seed + gen
+            # Update seed based on consistent_data config
+            consistent_data = getattr(data_config, 'consistent_data', True)
+            if consistent_data:
+                data_loader.seed = seed
+            else:
+                data_loader.seed = seed + gen
         values, anomalies = data_loader.load()
         assert isinstance(values, list), "values must be a list"
         assert isinstance(anomalies, list), "anomalies must be a list"
@@ -196,8 +201,11 @@ def fitness_breakdown(
         assert all(isinstance(v, (int, float)) for v in values), "values must be numeric"
         assert all(isinstance(a, bool) for a in anomalies), "anomalies must be boolean"
     else:
+        # Fallback to generate_mock_data for backward compatibility
+        consistent_data = getattr(data_config, 'consistent_data', True)
+        data_seed = seed if consistent_data else seed + gen
         values, anomalies = generate_mock_data(
-            seed + gen,
+            data_seed,
             size=data_config.mock_size,
             anomaly_count=data_config.anomaly_count,
             anomaly_multiplier=data_config.anomaly_multiplier,
@@ -309,8 +317,15 @@ def fitness(
     # Use provided data loader or create mock data
     if data_loader is not None:
         if isinstance(data_loader, MockDataLoader):
-            # Update seed for mock data loader
-            data_loader.seed = seed + gen
+            # Update seed based on consistent_data config
+            # If consistent_data is True, use same seed across generations
+            # If False, use seed + gen (different data per generation)
+            if hasattr(data_config, 'consistent_data') and data_config.consistent_data:
+                # Use base seed for consistent data across generations
+                data_loader.seed = seed
+            else:
+                # Use seed + gen for varying data per generation (legacy behavior)
+                data_loader.seed = seed + gen
         values, anomalies = data_loader.load()
         
         # Validate data loader output format
@@ -321,8 +336,11 @@ def fitness(
         assert all(isinstance(a, bool) for a in anomalies), "anomalies must be boolean"
     else:
         # Fallback to generate_mock_data for backward compatibility
+        # Use consistent seed if configured, otherwise seed + gen
+        consistent_data = getattr(data_config, 'consistent_data', True)
+        data_seed = seed if consistent_data else seed + gen
         values, anomalies = generate_mock_data(
-            seed + gen,
+            data_seed,
             size=data_config.mock_size,
             anomaly_count=data_config.anomaly_count,
             anomaly_multiplier=data_config.anomaly_multiplier,

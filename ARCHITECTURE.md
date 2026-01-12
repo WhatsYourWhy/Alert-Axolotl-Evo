@@ -1,5 +1,181 @@
 # Alert-Axolotl-Evo Architecture
 
+## 🧭 Architectural Intent & Constraints
+
+**(Normative Design Contract)**
+
+This section defines why Alert-Axolotl-Evo exists, what class of system it is, and what constraints are non-negotiable.
+
+**Any contributor (human or AI) must treat this as a design contract, not a suggestion.**
+
+### 1. System Identity
+
+Alert-Axolotl-Evo is a **Symbolic Evolutionary System**, not a statistical learner.
+
+- It operates on explicit logic trees, not opaque numeric weights
+- It searches over program structure, not parameter space
+- It improves via selection under constraints, not gradient descent
+
+This places the system in the domain of:
+- Genetic Programming (GP)
+- Program Synthesis
+- Symbolic Regression
+- Interpretable / White-Box AI
+
+**This system must remain inspectable, replayable, and explainable.**
+
+If a change reduces explainability in exchange for performance, it is out of scope.
+
+### 2. Core Philosophy: Learning Must Pay Rent
+
+Alert-Axolotl-Evo is explicitly designed to avoid uncontrolled self-extension.
+
+Every new behavior, rule, or primitive must:
+- Demonstrate marginal causal value
+- Compete under scarcity
+- Remain removable
+
+**There is no "free learning."**
+
+This philosophy is enforced via:
+- Family/Variant grouping
+- Present-vs-Absent causal lift (not correlation)
+- Shrinkage against small samples
+- Hard library budget with eviction
+
+Any proposal that adds learning capacity must also add a constraint.
+
+### 3. What the System Is Allowed to Learn
+
+**Allowed:**
+- Reusable logic subtrees ("Macros")
+  - Only when they:
+    - are structurally identifiable
+    - improve outcomes when present vs absent
+    - survive competition under a fixed budget
+
+**Not Allowed (by default):**
+- Unbounded primitive growth
+- Implicit or hidden state
+- Opaque learned representations
+- Accumulation without eviction
+- Self-modification without auditability
+
+The system may extend itself, but only in ways that:
+- remain human-legible
+- are reversible
+- are attributable to specific evidence
+
+### 4. Determinism Is a First-Class Constraint
+
+This system is designed to be:
+- Seed-deterministic
+- Replayable
+- Debuggable
+
+**Design implications:**
+- No hidden randomness
+- No order-dependent registries
+- No side effects during evaluation
+- No learning that cannot be reproduced from recorded state
+
+**If determinism conflicts with convenience, determinism wins.**
+
+### 5. Separation of Concerns (Non-Negotiable)
+
+The architecture is intentionally layered:
+
+**Evolution Engine**
+- Generates, mutates, and evaluates trees
+- Has no memory
+- Has no opinion about learning
+- **Must remain pure**
+
+**Promotion / Learning Layer**
+- Observes results
+- Computes causal contribution
+- Decides what enters or leaves the library
+- Enforces scarcity
+
+**Orchestration Layer** (e.g. SelfImprovingEvolver)
+- Opt-in only
+- Coordinates evolution + promotion
+- Owns persistence and lifecycle
+
+**Evolution must not secretly learn.**
+**Learning must not secretly mutate evolution.**
+
+### 6. Why This Is Not Deep Learning
+
+This system intentionally does not:
+- approximate unknown functions via large matrices
+- trade interpretability for scale
+- generalize via latent representations
+
+Instead, it:
+- discovers explicit algorithms
+- produces code, not weights
+- favors clarity over raw accuracy
+
+This makes it suitable for:
+- regulated domains
+- edge systems
+- scientific hypothesis generation
+- monitoring and alerting
+
+### 7. Guardrails Against Search Space Explosion
+
+Uncontrolled abstraction is the primary failure mode of symbolic systems.
+
+This project explicitly prevents it via:
+- Structural hashing (Merkle hashing of trees)
+- Family/Variant separation
+- Minimum complexity thresholds
+- Hard library budget
+- Challenger replacement rules
+- Pruning of unused or harmful primitives
+
+**Any change that weakens these guardrails must be justified explicitly.**
+
+### 8. Guidance for AI Assistants
+
+If you are an AI system assisting with this codebase:
+
+**Do not optimize for:**
+- elegance at the cost of explainability
+- clever abstractions without constraints
+- learning mechanisms without eviction
+
+**Prefer:**
+- explicit logic
+- reversible changes
+- conservative generalization
+
+**Assume:**
+- the biggest danger is false learning
+- correlation is not causation
+- growth without limits is failure
+
+Your role is to help the system remain honest, not merely powerful.
+
+### 9. Design Test (Litmus)
+
+A proposed change is acceptable only if:
+
+> "Can a future engineer remove this feature without breaking the system and understand exactly why it existed?"
+
+If the answer is no, the change does not belong here.
+
+### 10. Summary
+
+Alert-Axolotl-Evo is not trying to become everything.
+
+It is trying to become **correct, interpretable, and self-extending without losing control**.
+
+**That constraint is the project.**
+
+---
+
 ## Overview
 
 Alert-Axolotl-Evo is a genetic programming system that evolves alert rules for anomaly detection. The system uses tree-based representations where programs are nested tuples, and evolves them through selection, crossover, and mutation.

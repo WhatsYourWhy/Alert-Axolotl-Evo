@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from alert_axolotl_evo.config import DataConfig, FitnessConfig
 from alert_axolotl_evo.data import DataLoader, MockDataLoader
 from alert_axolotl_evo.primitives import ALERT, FUNCTIONS, ARITIES
-from alert_axolotl_evo.tree import is_valid_alert_rule, node_count
+from alert_axolotl_evo.tree import is_valid_alert_rule, node_count, is_self_comparison
 
 
 def generate_mock_data(seed: int, size: int = 100, anomaly_count: int = 8, anomaly_multiplier: float = 2.5) -> Tuple[List[float], List[bool]]:
@@ -125,6 +125,7 @@ def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
     op = tree[0]
 
     # 3. Handle Special 'if_alert' (returns string or None)
+    # For invalid conditions, returns a special sentinel tuple to mark invalidity
     if op == "if_alert":
         if len(tree) != 3:
             return None
@@ -134,11 +135,14 @@ def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
         # STRICT: condition must be bool, not truthy
         # This prevents strings/numbers from being "always true"
         if type(cond_val) is not bool:
-            return None  # Invalid condition - treat as no alert
+            # Return a special sentinel to mark invalid condition
+            # This will be detected in fitness evaluation and counted as invalid
+            return ("__INVALID_CONDITION__", cond_val, msg)
         
         # Message must be a string
         if not isinstance(msg, str):
-            return None  # Invalid message
+            # Return a special sentinel to mark invalid message
+            return ("__INVALID_MESSAGE__", cond_val, msg)
         
         return ALERT(cond_val, msg)
 
@@ -241,7 +245,16 @@ def fitness_breakdown(
         
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
-        if result is not None and not isinstance(result, str):
+        # Invalid conditions/messages return special sentinel tuples
+        if isinstance(result, tuple) and len(result) > 0:
+            if result[0] in ("__INVALID_CONDITION__", "__INVALID_MESSAGE__"):
+                invalid_output_count += 1
+                # Treat as no alert for this iteration
+                result = None
+            elif result is not None and not isinstance(result, str):
+                invalid_output_count += 1
+                result = None
+        elif result is not None and not isinstance(result, str):
             invalid_output_count += 1
             # If we get invalid output, treat as no alert for this iteration
             result = None
@@ -273,6 +286,13 @@ def fitness_breakdown(
     # SOFT PENALTY: Penalize invalid outputs
     if invalid_rate > 0.0:
         score -= 0.5 * invalid_rate
+    
+    # DEGENERATE COMPARISON PENALTY: Self-comparisons are always False/True and useless
+    # Check the condition subtree for self-comparisons
+    if isinstance(tree, tuple) and len(tree) >= 3 and tree[0] == "if_alert":
+        condition = tree[1]
+        if is_self_comparison(condition):
+            score -= 10.0  # Heavy penalty for self-comparisons (always False/True)
     
     # NO-ALERT PENALTY: Trees that never alert are useless
     if tp == 0 and fp == 0:
@@ -386,7 +406,16 @@ def fitness(
         
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
-        if result is not None and not isinstance(result, str):
+        # Invalid conditions/messages return special sentinel tuples
+        if isinstance(result, tuple) and len(result) > 0:
+            if result[0] in ("__INVALID_CONDITION__", "__INVALID_MESSAGE__"):
+                invalid_output_count += 1
+                # Treat as no alert for this iteration
+                result = None
+            elif result is not None and not isinstance(result, str):
+                invalid_output_count += 1
+                result = None
+        elif result is not None and not isinstance(result, str):
             invalid_output_count += 1
             # If we get invalid output, treat as no alert for this iteration
             result = None
@@ -428,6 +457,13 @@ def fitness(
     
     # Apply invalid output penalty
     score -= score_invalid_penalty
+    
+    # DEGENERATE COMPARISON PENALTY: Self-comparisons are always False/True and useless
+    # Check the condition subtree for self-comparisons
+    if isinstance(tree, tuple) and len(tree) >= 3 and tree[0] == "if_alert":
+        condition = tree[1]
+        if is_self_comparison(condition):
+            score -= 10.0  # Heavy penalty for self-comparisons (always False/True)
     
     # NO-ALERT PENALTY: Trees that never alert are useless
     if tp == 0 and fp == 0:

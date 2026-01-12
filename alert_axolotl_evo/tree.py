@@ -238,6 +238,44 @@ def is_valid_alert_rule(tree: Any) -> bool:
     return is_valid_subtree(tree, ARITIES)
 
 
+def is_self_comparison(tree: Any) -> bool:
+    """
+    Check if a comparison is comparing the same expression to itself.
+    
+    Examples of self-comparisons (always False/True):
+    - ('<', 'latency', 'latency')
+    - ('>', ('max', 'latency'), ('max', 'latency'))
+    - ('>=', 25, 25)
+    
+    Args:
+        tree: Tree structure to check
+        
+    Returns:
+        True if tree is a self-comparison, False otherwise
+    """
+    if not isinstance(tree, tuple) or len(tree) < 3:
+        return False
+    
+    op = tree[0]
+    if op not in (">", "<", ">=", "<=", "==", "!="):
+        return False
+    
+    left = tree[1]
+    right = tree[2]
+    
+    # Check if left and right are structurally identical
+    # This catches cases like ('<', 'latency', 'latency') and ('>', ('max', 'latency'), ('max', 'latency'))
+    if left == right:
+        return True
+    
+    # Also check for constant comparisons (comparing a number to itself)
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        if left == right:
+            return True
+    
+    return False
+
+
 def ensure_alert_root(tree: Any, rng: Optional[random.Random] = None) -> Any:
     """
     Ensure tree has if_alert at root, wrapping if necessary.

@@ -274,9 +274,16 @@ def fitness_breakdown(
     
     # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
+    normal_count = total_rows - possible_tp
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
-    fp_rate = fp / possible_tp if possible_tp > 0 else 0.0
+    fp_rate = fp / possible_tp if possible_tp > 0 else 0.0  # Domain metric: FP per anomaly
     fn_rate = fn / possible_tp if possible_tp > 0 else 0.0
+    
+    # Calculate classic metrics for precision pressure
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    fpr = fp / normal_count if normal_count > 0 else 0.0  # Classic FPR: FP / normal_count
+    recall = tp_rate  # Alias for clarity
+    
     beta = fitness_config.beta
     beta_sq = beta**2
     denom = (1 + beta_sq) * tp_rate + beta_sq * fn_rate + fp_rate
@@ -326,9 +333,13 @@ def fitness_breakdown(
         "fp": fp,
         "fn": fn,
         "possible_tp": possible_tp,
+        "normal_count": normal_count,
         "tp_rate": tp_rate,
-        "fp_rate": fp_rate,
+        "fp_rate": fp_rate,  # Domain metric: FP per anomaly
         "fn_rate": fn_rate,
+        "precision": precision,  # Classic: TP/(TP+FP)
+        "fpr": fpr,  # Classic: FP/normal_count
+        "recall": recall,  # Alias for tp_rate
         "f_beta": f_beta,
         "score": score,
         "penalty": penalty,
@@ -485,10 +496,26 @@ def fitness(
     elif alert_rate > 0.20:  # More than 20% but <= 50%
         score -= 3.0  # Penalty for too-high alert rate
     
+    # PRECISION PRESSURE: Penalize low precision (too many false alarms)
+    # Target precision >= 0.3 (30%) for human-paged alerts
+    normal_count = total_rows - possible_tp
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    fpr = fp / normal_count if normal_count > 0 else 0.0
+    recall = tp / possible_tp if possible_tp > 0 else 0.0
+    
+    if (tp + fp) > 0:
+        if precision < 0.3:
+            # Soft penalty that scales with how far below target
+            precision_deficit = 0.3 - precision
+            score -= 5.0 * precision_deficit  # Max penalty of 1.5 for 0% precision
+    
+    # FPR PENALTY: Also penalize very high false positive rate directly
+    if fpr > 0.15:  # More than 15% false positive rate
+        score -= 2.0 * (fpr - 0.15)  # Penalty scales with excess FPR
+    
     # MINIMUM TP FLOOR: Soft constraint for minimum useful detection
     # If we have labeled anomalies, require at least 1 TP (or recall >= 0.1)
     if possible_tp > 0:
-        recall = tp / possible_tp
         if recall < 0.1 and tp == 0:  # No detection at all
             score -= 3.0  # Additional penalty for zero detection
     
@@ -554,9 +581,15 @@ def print_fitness_comparison(
     print(f"  Tree: {champion_tree}")
     print(f"  Fitness: {champion_breakdown['fitness']:.3f}")
     print(f"  TP: {champion_breakdown['tp']}, FP: {champion_breakdown['fp']}, FN: {champion_breakdown['fn']}")
-    print(f"  TP Rate: {champion_breakdown['tp_rate']:.3f}, FP Rate: {champion_breakdown['fp_rate']:.3f}, FN Rate: {champion_breakdown['fn_rate']:.3f}")
+    # Classic metrics
+    precision = champion_breakdown.get('precision', 0.0)
+    fpr = champion_breakdown.get('fpr', 0.0)
+    recall = champion_breakdown.get('recall', champion_breakdown.get('tp_rate', 0.0))
+    print(f"  Recall: {recall:.3f} ({recall*100:.1f}%)")
+    print(f"  Precision: {precision:.3f} ({precision*100:.1f}%)")
+    print(f"  FPR: {fpr:.3f} ({fpr*100:.1f}%)")
     print(f"  F-beta: {champion_breakdown['f_beta']:.3f}")
-    # New metrics
+    # Additional metrics
     alert_rate = champion_breakdown.get('alert_rate', 0.0)
     invalid_rate = champion_breakdown.get('invalid_rate', 0.0)
     node_count = champion_breakdown.get('node_count', 0)

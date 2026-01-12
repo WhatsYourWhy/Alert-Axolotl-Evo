@@ -276,6 +276,60 @@ def is_self_comparison(tree: Any) -> bool:
     return False
 
 
+def canonicalize_comparison(tree: Any) -> Any:
+    """
+    Canonicalize comparison operators for readability and pattern matching.
+    
+    Normalizes ('<=', 75, expr) into ('>=', expr, 75) and similar.
+    This helps with pattern discovery and reduces duplicate families.
+    
+    Rules:
+    - Prefer >= and > over <= and <
+    - Always put variable/expression on left, constant on right
+    - Preserves semantic equivalence
+    
+    Args:
+        tree: Tree structure to canonicalize
+        
+    Returns:
+        Canonicalized tree (or original if not a comparison)
+    """
+    if not isinstance(tree, tuple) or len(tree) < 3:
+        return tree
+    
+    op = tree[0]
+    left = tree[1]
+    right = tree[2]
+    
+    # Only canonicalize comparison operators
+    if op not in (">", "<", ">=", "<=", "==", "!="):
+        # Recursively canonicalize children
+        return (op,) + tuple(canonicalize_comparison(child) for child in tree[1:])
+    
+    # Check if left is a constant and right is not
+    left_is_const = isinstance(left, (int, float))
+    right_is_const = isinstance(right, (int, float))
+    
+    # Canonicalize: always put variable/expression on left, constant on right
+    # And prefer >= and > over <= and <
+    if left_is_const and not right_is_const:
+        # Swap and invert operator
+        if op == "<=":
+            return ('>=', canonicalize_comparison(right), left)
+        elif op == "<":
+            return ('>', canonicalize_comparison(right), left)
+        elif op == ">=":
+            return ('<=', canonicalize_comparison(right), left)
+        elif op == ">":
+            return ('<', canonicalize_comparison(right), left)
+        # == and != are symmetric, just swap
+        elif op in ("==", "!="):
+            return (op, canonicalize_comparison(right), left)
+    
+    # Recursively canonicalize children
+    return (op, canonicalize_comparison(left), canonicalize_comparison(right))
+
+
 def ensure_alert_root(tree: Any, rng: Optional[random.Random] = None) -> Any:
     """
     Ensure tree has if_alert at root, wrapping if necessary.

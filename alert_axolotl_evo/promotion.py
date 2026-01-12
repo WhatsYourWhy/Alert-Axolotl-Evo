@@ -67,6 +67,8 @@ class PromotionManager:
         self.MIN_SHRUNKEN_LIFT = 1.02  # Must be 2% better than average
         self.MIN_NODES = 4  # Filter trivial fragments
         self.MIN_SAMPLES = 20  # Minimum observations before promotion
+        self.MIN_EVIDENCE_FOR_GHOST = 5  # Minimum total observations before ghost pruning (prevents "never got a chance" evictions)
+        self.MIN_EVIDENCE_FOR_HARM = 10  # Minimum total observations before harmful pruning (prevents fluke early demotions)
 
     def process_generation_results(self, champions: List[Dict], current_gen: int):
         """
@@ -176,9 +178,22 @@ class PromotionManager:
                     promoted.append(variant.registry_name)
 
         # 3. Prune Ghosts / Harmful
+        # Only prune active_library entries (never candidates - they haven't earned library space yet)
         for name, variant in list(self.active_library.items()):
-            is_ghost = (current_gen - variant.stats.last_seen_gen) > 15
-            is_harmful = variant.stats.get_shrunken_lift(k=20) < 0.99
+            # Calculate total observations (present + absent) for evidence checks
+            total_obs = variant.stats.present_count + variant.stats.absent_count
+            
+            # Ghost pruning: pattern hasn't been seen for 15+ ticks
+            # BUT: only apply ghost logic if pattern has minimum total observations
+            # This prevents "never got a chance" evictions during sparse periods
+            has_min_evidence_for_ghost = total_obs >= self.MIN_EVIDENCE_FOR_GHOST
+            is_ghost = has_min_evidence_for_ghost and (current_gen - variant.stats.last_seen_gen) > 15
+            
+            # Harmful: pattern is actively worse than average
+            # BUT: only apply harmful logic if pattern has minimum total observations
+            # This prevents fluke early demotions due to shrinkage wobble with low samples
+            has_min_evidence_for_harm = total_obs >= self.MIN_EVIDENCE_FOR_HARM
+            is_harmful = has_min_evidence_for_harm and variant.stats.get_shrunken_lift(k=20) < 0.99
             
             if is_ghost or is_harmful:
                 self._retire(variant, unregister_fn)

@@ -34,8 +34,22 @@ def evolve(
     checkpoint_path: Optional[Path] = None,
     save_checkpoint_path: Optional[Path] = None,
     export_rule_path: Optional[Path] = None,
+    data_loader: Optional[DataLoader] = None,
 ) -> None:
-    """Main evolution loop."""
+    """
+    Main evolution loop.
+    
+    Args:
+        seed: Random seed (overrides config if provided)
+        pop_size: Population size (overrides config if provided)
+        generations: Number of generations (overrides config if provided)
+        config: Configuration object
+        checkpoint_path: Path to checkpoint file to resume from
+        save_checkpoint_path: Path to save checkpoint file
+        export_rule_path: Path to export final champion rule
+        data_loader: Optional DataLoader instance (overrides config.data if provided)
+                    Allows programmatic injection of custom data loaders or data from memory
+    """
     if config is None:
         config = Config()
     
@@ -46,18 +60,19 @@ def evolve(
     
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     
-    # Create data loader
-    try:
-        data_loader = create_data_loader(config.data)
-    except Exception as e:
-        logging.getLogger("evo").warning(f"Failed to create data loader: {e}. Using mock data.")
-        from alert_axolotl_evo.data import MockDataLoader
-        data_loader = MockDataLoader(
-            seed=seed,
-            size=config.data.mock_size,
-            anomaly_count=config.data.anomaly_count,
-            anomaly_multiplier=config.data.anomaly_multiplier,
-        )
+    # Create data loader (use provided one or create from config)
+    if data_loader is None:
+        try:
+            data_loader = create_data_loader(config.data)
+        except Exception as e:
+            logging.getLogger("evo").warning(f"Failed to create data loader: {e}. Using mock data.")
+            from alert_axolotl_evo.data import MockDataLoader
+            data_loader = MockDataLoader(
+                seed=seed,
+                size=config.data.mock_size,
+                anomaly_count=config.data.anomaly_count,
+                anomaly_multiplier=config.data.anomaly_multiplier,
+            )
     
     # Load checkpoint if provided
     start_gen = 0

@@ -47,6 +47,7 @@ class SelfImprovingEvolver:
         enable_promotion_manager: bool = False,
         library_budget: int = 50,
         min_promo_batch: int = 5,
+        promo_warmup_ticks: int = 2,
     ):
         self.results_dir = results_dir
         self.results_dir.mkdir(exist_ok=True, parents=True)
@@ -58,9 +59,17 @@ class SelfImprovingEvolver:
         self.adapt_data = adapt_data
         self.min_pattern_usage = min_pattern_usage
         self.enable_promotion_manager = enable_promotion_manager
+        # Policy guard: minimum batch size to update the market this tick
+        # (not a statistical validity threshold - that's handled by MIN_SAMPLES in PromotionManager)
         self.min_promo_batch = min_promo_batch
+        # Warmup period: prevent early noise by skipping promote_and_prune until this many ticks
+        self.promo_warmup_ticks = promo_warmup_ticks
         
-        # Monotonic economic clock for PromotionManager (independent of GP generation)
+        # Monotonic economic run index for PromotionManager (independent of GP generation)
+        # Semantics: "wall-clock runs" - increments on every run attempt, even if batch is too small
+        # This ensures ghost pruning works correctly: patterns not seen for N runs are evicted
+        # regardless of whether those runs were skipped due to small batches or warmup
+        # Used as current_gen in PromotionManager for last_seen_gen tracking and pruning
         self.economy_tick = 0
         
         # Initialize Promotion Manager if enabled
@@ -155,29 +164,46 @@ class SelfImprovingEvolver:
             # This ensures ghost pruning works correctly across multiple runs
             current_gen = self.economy_tick
             
-            # Batch-size guard: prevent promotion on micro-batches where lift is meaningless
-            # Policy-level check: batch must be large enough for meaningful causal lift
-            # Note: promotion.py has its own < 2 defensive guard
+            # Policy guard: minimum batch size to update the market this tick
+            # (prevents noisy economics from tiny batches)
+            # Note: promotion.py has its own < 2 defensive guard for safety
             if len(champions) < self.min_promo_batch:
-                # Still increment tick (economic time progresses even without promotion)
+                logger.debug(
+                    f"SKIP: batch too small (batch_size={len(champions)}, "
+                    f"min_required={self.min_promo_batch}, economy_tick={self.economy_tick})"
+                )
+                # Increment tick (wall-clock run semantics: time progresses even without market update)
+                # This ensures ghost pruning works: patterns age even if runs are skipped
+                # The debug log above records metadata (batch_size, economy_tick) for debugging gaps
                 self.economy_tick += 1
                 return
             
-            # Process generation results
+            # Always update stats if batch is adequate (evidence accumulation from day one)
+            # This happens regardless of warmup period
             self.promotion_manager.process_generation_results(champions, current_gen)
             
-            # Promote and prune
-            promoted = self.promotion_manager.promote_and_prune(
-                current_gen,
-                register_function,
-                unregister_function
-            )
+            # Warmup guard: only promote/prune after warmup period to prevent early noise
+            # Warmup is based on economy_tick (monotonic run index), not GP generation
+            # Tick 0..(warmup-1): stats only (evidence collection)
+            # Tick warmup..: market allowed (promotion/pruning)
+            # Note: current_gen passed to process_generation_results must match economy_tick
+            # because PromotionManager uses (current_gen - last_seen_gen) for ghost pruning
+            if self.economy_tick < self.promo_warmup_ticks:
+                logger.debug(f"SKIP: warmup period (tick {self.economy_tick} < {self.promo_warmup_ticks})")
+            else:
+                # Promote and prune (market decisions allowed after warmup)
+                promoted = self.promotion_manager.promote_and_prune(
+                    current_gen,
+                    register_function,
+                    unregister_function
+                )
+                
+                if promoted:
+                    self.promoted_macros.extend(promoted)
+                    logger.info(f"🎊 Promotion Manager: Promoted {len(promoted)} macros: {promoted}")
             
-            if promoted:
-                self.promoted_macros.extend(promoted)
-                logger.info(f"🎊 Promotion Manager: Promoted {len(promoted)} macros: {promoted}")
-            
-            # Increment economic clock after processing (whether promotion happened or not)
+            # Increment economic clock after market update attempt
+            # This ensures tick semantics: tick N processes data, tick N+1 is next cycle
             self.economy_tick += 1
         except Exception as e:
             logger.warning(f"Promotion manager processing failed: {e}")
@@ -570,4 +596,97 @@ class SelfImprovingEvolver:
             }
         
         return report
+    
+    def get_market_status(self) -> Dict[str, Any]:
+        """
+        Get current market status for observability.
+        
+        Returns:
+            Dictionary with market metrics:
+            - economy_tick: Current economic run index
+            - active_library_size: Number of active macros
+            - library_budget: Maximum allowed active macros
+            - top_actives: Top 5 active macros by shrunken lift
+            - recent_promotions: Recently promoted macros
+            - candidate_count: Number of candidate patterns being tracked
+        """
+        if not self.enable_promotion_manager or not self.promotion_manager:
+            return {
+                "economy_tick": self.economy_tick,
+                "status": "PromotionManager not enabled"
+            }
+        
+        pm = self.promotion_manager
+        
+        # Get top actives by shrunken lift
+        actives = []
+        for name, variant in pm.active_library.items():
+            lift = variant.stats.get_shrunken_lift()
+            total_obs = variant.stats.present_count + variant.stats.absent_count
+            actives.append({
+                "name": name,
+                "lift": lift,
+                "present_count": variant.stats.present_count,
+                "absent_count": variant.stats.absent_count,
+                "total_obs": total_obs,
+                "last_seen_gen": variant.stats.last_seen_gen,
+                "age": self.economy_tick - variant.stats.last_seen_gen,
+            })
+        actives.sort(key=lambda x: x["lift"], reverse=True)
+        top_actives = actives[:5]
+        
+        # Count candidates
+        candidate_count = sum(
+            len([v for v in variants.values() if v.status == "candidate"])
+            for variants in pm.families.values()
+        )
+        
+        return {
+            "economy_tick": self.economy_tick,
+            "active_library_size": len(pm.active_library),
+            "library_budget": pm.LIBRARY_BUDGET,
+            "budget_utilization": f"{len(pm.active_library)}/{pm.LIBRARY_BUDGET}",
+            "top_actives": top_actives,
+            "recent_promotions": self.promoted_macros[-10:],  # Last 10 promotions
+            "total_promoted": len(self.promoted_macros),
+            "candidate_count": candidate_count,
+            "warmup_active": self.economy_tick < self.promo_warmup_ticks,
+        }
+    
+    def print_market_status(self) -> None:
+        """Print a human-readable market status report."""
+        status = self.get_market_status()
+        
+        if status.get("status") == "PromotionManager not enabled":
+            print(f"Economy Tick: {status['economy_tick']}")
+            print("PromotionManager not enabled")
+            return
+        
+        print("\n" + "="*60)
+        print("MARKET STATUS REPORT")
+        print("="*60)
+        print(f"Economy Tick: {status['economy_tick']}")
+        print(f"Active Library: {status['budget_utilization']}")
+        
+        if status['warmup_active']:
+            print(f"[WARN] Warmup Period: {status['economy_tick']} < {self.promo_warmup_ticks} (stats only, no promotions)")
+        
+        if status['top_actives']:
+            print(f"\nTop {len(status['top_actives'])} Active Macros (by Shrunken Lift):")
+            for i, active in enumerate(status['top_actives'], 1):
+                print(f"  {i}. {active['name']}")
+                print(f"     Lift: {active['lift']:.3f}x | "
+                      f"Present: {active['present_count']} | "
+                      f"Absent: {active['absent_count']} | "
+                      f"Age: {active['age']} ticks")
+        else:
+            print("\nActive Library: Empty (no promotions yet)")
+        
+        if status['recent_promotions']:
+            print(f"\nRecent Promotions ({len(status['recent_promotions'])}): {status['recent_promotions']}")
+        else:
+            print("\nRecent Promotions: None yet")
+        
+        print(f"\nCandidates Being Tracked: {status['candidate_count']}")
+        print("="*60 + "\n")
 

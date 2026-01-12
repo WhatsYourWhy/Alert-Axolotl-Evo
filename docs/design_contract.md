@@ -62,6 +62,10 @@ Must not run competing learning systems in parallel.
   - Library size is capped; eviction and challenger replacement are required.
 - Promotion is reversible.
   - Underperforming or unused macros must be removable via unregister.
+- Economic time semantics are monotonic and wall-clock based.
+  - `economy_tick` (or `economy_run_idx`) represents "wall-clock runs" - increments on every run attempt.
+  - This ensures ghost pruning works: patterns age even if runs are skipped (small batch, warmup, etc.).
+  - The tick advances regardless of whether market updates occurred, so `(current_gen - last_seen_gen)` correctly measures pattern age.
 
 ## Safe contribution checklist for AI edits
 

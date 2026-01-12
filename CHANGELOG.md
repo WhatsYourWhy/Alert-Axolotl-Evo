@@ -2,6 +2,34 @@
 
 All notable changes to Alert-Axolotl-Evo will be documented in this file.
 
+## [1.2.0] - 2026-01-11
+
+### Added
+- **Auto-Registration of Primitives**: System automatically registers new function and terminal primitives based on discovered patterns
+  - Registers common combinations like `avg_gt`, `avg_lt`, `max_gt`, `min_lt`
+  - Registers frequently-used threshold values as terminal constants
+  - New primitives become available for future evolution runs
+- **Adaptive Data Generation**: System automatically adapts mock data parameters to improve training effectiveness
+  - Adapts based on fitness trends, rule complexity, and threshold patterns
+  - Conservative adjustments (max 20% change per run)
+  - Only adapts mock data (never modifies real CSV/JSON data)
+  - Tracks all adaptations with reasons
+- **Configuration Options**: New parameters for `SelfImprovingEvolver`
+  - `auto_register`: Enable/disable auto-registration (default: True)
+  - `adapt_data`: Enable/disable data adaptation (default: True)
+  - `min_pattern_usage`: Minimum pattern count to trigger registration (default: 5)
+- **Enhanced Tracking**: System tracks auto-improvements
+  - `registered_primitives`: List of auto-registered primitives
+  - `data_adaptations`: History of data parameter changes with reasons
+- **Enhanced Performance Reports**: Reports now include auto-improvement history
+  - `auto_registered_primitives`: List of registered primitives
+  - `data_adaptations`: Last 5 data adaptations with details
+
+### Changed
+- `SelfImprovingEvolver.__init__()`: Added optional parameters `auto_register`, `adapt_data`, `min_pattern_usage`
+- `SelfImprovingEvolver.run_and_learn()`: Now automatically registers primitives and adapts data before evolution
+- `SelfImprovingEvolver.get_performance_report()`: Includes new fields for auto-improvements
+
 ## [1.1.0] - 2026-01-11
 
 ### Added

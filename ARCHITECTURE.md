@@ -428,7 +428,10 @@ The meta-evolution system creates a recursive self-improvement mechanism where t
 #### `self_improving.py`
 - **SelfImprovingEvolver**: Wrapper that learns from each run
 - **Automatic Tuning**: Adjusts config based on successful runs
+- **Auto-Registration**: Automatically registers new primitives based on patterns
+- **Data Adaptation**: Automatically adapts training data parameters
 - **Improvement Suggestions**: Recommends system improvements
+- **Performance Tracking**: Tracks registered primitives and data adaptations
 
 ### Meta-Evolution Flow
 
@@ -453,18 +456,28 @@ The meta-evolution system creates a recursive self-improvement mechanism where t
 1. Run Evolution
    └─> Save results to results_dir
 
-2. Analyze Results
+2. Auto-Improve (before next run)
+   ├─> Auto-Register Primitives
+   │   ├─> Discover common patterns
+   │   ├─> Register new function primitives (avg_gt, max_gt, etc.)
+   │   └─> Register common threshold terminals
+   ├─> Adapt Data Generation
+   │   ├─> Analyze fitness trends and complexity
+   │   ├─> Adjust mock data parameters conservatively
+   │   └─> Track adaptations with reasons
+
+3. Analyze Results
    ├─> Track performance metrics
    ├─> Identify successful configs
    └─> Discover patterns
 
-3. Learn & Improve
+4. Learn & Improve
    ├─> Update learned optimal config
    ├─> Generate improvement suggestions
    └─> Tune parameters automatically
 
-4. Next Run
-   └─> Use learned config for better results
+5. Next Run
+   └─> Use learned config and new primitives for better results
 ```
 
 ### Usage Example
@@ -473,16 +486,26 @@ The meta-evolution system creates a recursive self-improvement mechanism where t
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.config import Config
 
-evolver = SelfImprovingEvolver()
+evolver = SelfImprovingEvolver(
+    auto_register=True,  # Enable auto-registration
+    adapt_data=True,     # Enable data adaptation
+)
 config = Config()
 
 # Run multiple times, learning each time
 for i in range(5):
     config = evolver.get_optimal_config(config)  # Use learned config
-    evolver.run_and_learn(config, f"run_{i}")
+    evolver.run_and_learn(config, f"run_{i}")     # Auto-improves before each run
+
+# Check auto-improvements
+print(f"Registered primitives: {evolver.registered_primitives}")
+print(f"Data adaptations: {len(evolver.data_adaptations)}")
 
 # Get suggestions
 suggestions = evolver.suggest_improvements()
+
+# Get performance report with auto-improvement history
+report = evolver.get_performance_report()
 ```
 
 ## Future Enhancements

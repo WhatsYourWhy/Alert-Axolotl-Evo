@@ -237,17 +237,32 @@ evolve(config=optimal_config)
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.config import Config
 
-# System learns from each run
-evolver = SelfImprovingEvolver()
+# System learns from each run and auto-improves
+evolver = SelfImprovingEvolver(
+    auto_register=True,  # Auto-register new primitives from patterns
+    adapt_data=True,     # Adapt training data automatically
+)
 config = Config()
 
 for i in range(5):
     config = evolver.get_optimal_config(config)  # Gets learned optimal config
     evolver.run_and_learn(config, f"run_{i}")
 
+# Check what was auto-improved
+print(f"Auto-registered primitives: {evolver.registered_primitives}")
+print(f"Data adaptations: {len(evolver.data_adaptations)}")
+
 # Get improvement suggestions
 suggestions = evolver.suggest_improvements()
+
+# Get performance report with auto-improvement history
+report = evolver.get_performance_report()
 ```
+
+**New Features:**
+- **Auto-Registration**: Automatically registers new primitives (e.g., `avg_gt`, `max_gt`) based on discovered patterns
+- **Data Adaptation**: Automatically adapts mock data parameters to create more challenging training data
+- **Enhanced Reports**: Performance reports now include auto-registered primitives and data adaptation history
 
 ### Extending Primitives
 

@@ -601,7 +601,7 @@ Alert-Axolotl-Evo implements **Metric-Aligned Semantic Program Synthesis**, wher
 - **Degenerate Collapse Prevention**: Eliminates always-true/always-false solutions
 - **Invalid Output Gates**: Catches semantic errors in evolved logic
 
-**Implementation**: All alignment mechanisms are in [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) (lines 472-525).
+**Implementation**: All alignment mechanisms are in [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) (lines 540-669).
 
 **Baseline Verification**: The system includes built-in baseline comparison (`print_fitness_comparison()`) to ensure evolved solutions strictly dominate degenerate baselines (always-true, always-false, random threshold).
 

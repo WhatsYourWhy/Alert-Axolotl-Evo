@@ -714,7 +714,7 @@ def print_fitness_comparison(
     fitness_config: Optional[FitnessConfig] = None,
     data_config: Optional[DataConfig] = None,
     data_loader: Optional[DataLoader] = None,
-) -> None:
+) -> bool:
     """
     Print fitness breakdown comparing champion to baselines.
     
@@ -738,6 +738,10 @@ def print_fitness_comparison(
         fitness_config: Fitness configuration
         data_config: Data configuration
         data_loader: Optional data loader
+    
+    Returns:
+        bool: True if champion beats all baselines, False otherwise.
+        This return value can be used to enforce baseline comparison as an invariant.
     """
     print("\n" + "=" * 70)
     print("  FITNESS BREAKDOWN COMPARISON")
@@ -783,9 +787,17 @@ def print_fitness_comparison(
     print(f"  vs Always-True:  {improvement_over_true:+.3f}")
     print(f"  vs Random:       {improvement_over_random:+.3f}")
     
-    if champion_breakdown['fitness'] <= max(always_false['fitness'], always_true['fitness'], random_baseline['fitness']):
+    baseline_passed = champion_breakdown['fitness'] > max(
+        always_false['fitness'], 
+        always_true['fitness'], 
+        random_baseline['fitness']
+    )
+    
+    if not baseline_passed:
         print(f"\nWARNING: Champion is not better than all baselines!")
         print(f"   This suggests the evolution may be optimizing a loophole.")
     
     print("=" * 70 + "\n")
+    
+    return baseline_passed
 

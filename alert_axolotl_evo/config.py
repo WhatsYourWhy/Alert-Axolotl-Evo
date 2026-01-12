@@ -33,6 +33,7 @@ class FitnessConfig:
     bloat_penalty: float = 0.005
     fp_threshold: int = 40
     fp_penalty: float = 5.0
+    enforce_baseline_comparison: bool = True  # If True, evolution fails if champion doesn't beat baselines
 
 
 @dataclass
@@ -171,6 +172,7 @@ class Config:
                 "bloat_penalty": self.fitness.bloat_penalty,
                 "fp_threshold": self.fitness.fp_threshold,
                 "fp_penalty": self.fitness.fp_penalty,
+                "enforce_baseline_comparison": self.fitness.enforce_baseline_comparison,
             },
             "fitness_alignment": {
                 "min_precision": self.fitness_alignment.min_precision,

@@ -187,6 +187,7 @@ def evolve(
         logging.getLogger("evo").info("Final Champion Tree: %s", champion)
     
     # Print fitness breakdown comparison with baselines
+    # This is a critical invariant: champion must beat baselines (or warn/fail)
     try:
         champion_breakdown = fitness_breakdown(
             champion,
@@ -196,7 +197,7 @@ def evolve(
             config.data,
             data_loader,
         )
-        print_fitness_comparison(
+        baseline_passed = print_fitness_comparison(
             champion,
             champion_breakdown,
             seed,
@@ -205,6 +206,23 @@ def evolve(
             config.data,
             data_loader,
         )
+        
+        # Enforce baseline comparison invariant (configurable)
+        # See docs/design_contract.md: Fitness Invariants
+        if config.fitness.enforce_baseline_comparison and not baseline_passed:
+            error_msg = (
+                "FITNESS INVARIANT VIOLATION: Champion does not beat all baselines. "
+                "This indicates alignment may be broken or evolution found a loophole. "
+                "See docs/FITNESS_ALIGNMENT_VALIDATION.md for troubleshooting."
+            )
+            logging.getLogger("evo").error(error_msg)
+            raise ValueError(error_msg)
+    except ValueError as e:
+        # Re-raise baseline comparison failures (these are invariant violations)
+        if "FITNESS INVARIANT VIOLATION" in str(e):
+            raise
+        # Fall through to warning for other ValueErrors
+        logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")
     except Exception as e:
         logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")
     

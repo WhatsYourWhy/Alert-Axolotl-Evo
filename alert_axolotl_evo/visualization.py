@@ -3,7 +3,8 @@
 import hashlib
 import logging
 import random
-from typing import Any
+from collections import Counter
+from typing import Any, Dict, Tuple
 
 from alert_axolotl_evo.tree import tree_hash
 
@@ -60,4 +61,242 @@ def announce_birth(tree: Any) -> None:
     """Announce the birth of a new individual."""
     name = generate_name(tree)
     logging.getLogger("evo").info("A new beast awakens: %s (hash:%s)", name, tree_hash(tree))
+
+
+def generate_pattern_name(subtree_hash: str, subtree: Tuple) -> str:
+    """
+    Generate a fun, deterministic name for a discovered pattern.
+    
+    Args:
+        subtree_hash: Hash of the pattern
+        subtree: The actual subtree tuple
+        
+    Returns:
+        Fun pattern name
+    """
+    tree_str = str(subtree)
+    
+    # Special pattern types get epic names
+    if "'window_avg'" in tree_str and "'stddev'" in tree_str:
+        return "The Smooth Operator"
+    if "'and'" in tree_str and tree_str.count("'>'") >= 2:
+        return "The Multi-Threshold Guardian"
+    if "'percentile'" in tree_str:
+        return "The Percentile Prophet"
+    if "'window_avg'" in tree_str and "'window_max'" in tree_str:
+        return "The Window Wizard"
+    if "'stddev'" in tree_str and "'>'" in tree_str:
+        return "The Deviation Detector"
+    if "'window_min'" in tree_str and "'window_max'" in tree_str:
+        return "The Range Ranger"
+    if "'or'" in tree_str and tree_str.count("'>'") >= 2:
+        return "The Flexible Filter"
+    
+    # Generate deterministic name from hash
+    pattern_names = [
+        "The Pattern Prodigy",
+        "The Algorithm Alchemist", 
+        "The Logic Luminary",
+        "The Structure Sage",
+        "The Code Conjurer",
+        "The Pattern Pioneer",
+        "The Algorithm Architect",
+        "The Logic Legend",
+        "The Structure Sorcerer",
+        "The Pattern Prophet",
+    ]
+    
+    seed = int(hashlib.sha256(subtree_hash.encode()).hexdigest(), 16)
+    rng = random.Random(seed)
+    return rng.choice(pattern_names)
+
+
+def get_pattern_personality(subtree: Tuple) -> Dict[str, str]:
+    """
+    Determine pattern personality based on structure.
+    
+    Args:
+        subtree: Pattern subtree tuple
+        
+    Returns:
+        Dictionary with {archetype, trait, catchphrase}
+    """
+    tree_str = str(subtree)
+    
+    personality = {
+        "archetype": "The Guardian",
+        "trait": "reliable",
+        "catchphrase": "I detect anomalies!"
+    }
+    
+    if "'window_avg'" in tree_str:
+        personality["archetype"] = "The Smooth Operator"
+        personality["trait"] = "patient"
+        personality["catchphrase"] = "Let me smooth that out for you..."
+    
+    if "'stddev'" in tree_str:
+        personality["archetype"] = "The Statistician"
+        personality["trait"] = "analytical"
+        personality["catchphrase"] = "The numbers don't lie!"
+    
+    if "'and'" in tree_str and tree_str.count("'and'") >= 2:
+        personality["archetype"] = "The Perfectionist"
+        personality["trait"] = "demanding"
+        personality["catchphrase"] = "All conditions must be met!"
+    
+    if "'or'" in tree_str:
+        personality["archetype"] = "The Flexible"
+        personality["trait"] = "adaptable"
+        personality["catchphrase"] = "Any way works for me!"
+    
+    if "'percentile'" in tree_str:
+        personality["archetype"] = "The Percentile Prophet"
+        personality["trait"] = "wise"
+        personality["catchphrase"] = "I see the distribution!"
+    
+    if "'window_max'" in tree_str or "'window_min'" in tree_str:
+        personality["archetype"] = "The Window Watcher"
+        personality["trait"] = "observant"
+        personality["catchphrase"] = "I watch the trends!"
+    
+    return personality
+
+
+def announce_pattern_discovery(pattern_hash: str, pattern_name: str, 
+                               count: int, avg_fitness: float) -> None:
+    """
+    Dramatically announce a newly discovered pattern.
+    
+    Args:
+        pattern_hash: Hash of the pattern
+        pattern_name: Fun name for the pattern
+        count: Number of times pattern appears
+        avg_fitness: Average fitness of trees containing this pattern
+    """
+    logger = logging.getLogger("pattern_discovery")
+    
+    logger.info("🔍 *PATTERN DISCOVERED* 🔍")
+    logger.info("  Name: %s", pattern_name)
+    logger.info("  Appearances: %d champions", count)
+    logger.info("  Average Fitness: %.2f", avg_fitness)
+    
+    if count >= 10:
+        logger.info("  Status: 🌟 LEGENDARY PATTERN 🌟")
+    elif count >= 5:
+        logger.info("  Status: ⭐ CHAMPION PATTERN ⭐")
+    else:
+        logger.info("  Status: 💫 RISING PATTERN 💫")
+
+
+def announce_pattern_promotion(pattern_name: str, stage: str) -> None:
+    """
+    Celebrate pattern promotion through the lifecycle.
+    
+    Args:
+        pattern_name: Fun name for the pattern
+        stage: Lifecycle stage ("candidate", "probation", "promoted", "pruned")
+    """
+    logger = logging.getLogger("pattern_discovery")
+    
+    if stage == "candidate":
+        logger.info("🎯 %s has been identified as a CANDIDATE!", pattern_name)
+        logger.info("   It will be tested in the next generation...")
+    
+    elif stage == "probation":
+        logger.info("🧪 %s enters PROBATION!", pattern_name)
+        logger.info("   The system is watching... waiting...")
+    
+    elif stage == "promoted":
+        logger.info("🎉 *PROMOTION CEREMONY* 🎉")
+        logger.info("   %s has been PERMANENTLY REGISTERED!", pattern_name)
+        logger.info("   It is now part of the primitive library!")
+        logger.info("   🏆 All hail the new algorithm! 🏆")
+    
+    elif stage == "pruned":
+        logger.info("💀 %s has been PRUNED", pattern_name)
+        logger.info("   'Twas not meant to be...")
+
+
+def display_pattern_leaderboard(patterns: Dict[str, Any], top_n: int = 5) -> None:
+    """
+    Display a fun leaderboard of most effective patterns.
+    
+    Args:
+        patterns: Patterns dictionary from discover_structural_patterns()
+        top_n: Number of top patterns to display
+    """
+    logger = logging.getLogger("pattern_discovery")
+    
+    metadata = patterns.get("subtree_metadata", {})
+    hash_to_tree = patterns.get("hash_to_tree", {})
+    
+    if not metadata:
+        logger.info("No patterns to rank yet.")
+        return
+    
+    # Sort by effectiveness (count * avg_fitness)
+    ranked = []
+    for hash_val, meta in metadata.items():
+        if meta["count"] > 0:
+            avg_fit = meta["fitness_sum"] / meta["count"]
+            effectiveness = meta["count"] * avg_fit
+            subtree = hash_to_tree.get(hash_val)
+            if subtree:
+                pattern_name = generate_pattern_name(hash_val, subtree)
+                ranked.append((hash_val, pattern_name, meta["count"], avg_fit, effectiveness))
+    
+    ranked.sort(key=lambda x: x[4], reverse=True)  # Sort by effectiveness
+    ranked = ranked[:top_n]
+    
+    logger.info("\n🏆 PATTERN LEADERBOARD 🏆")
+    logger.info("=" * 50)
+    
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    for idx, (hash_val, pattern_name, count, avg_fit, _) in enumerate(ranked):
+        medal = medals[idx] if idx < len(medals) else f"{idx+1}️⃣"
+        logger.info("%s %s", medal, pattern_name)
+        logger.info("   Appearances: %d | Avg Fitness: %.2f", count, avg_fit)
+
+
+def print_pattern_discovery_summary(patterns: Dict[str, Any]) -> None:
+    """
+    Print a fun summary of pattern discovery results.
+    
+    Args:
+        patterns: Patterns dictionary from discover_structural_patterns()
+    """
+    logger = logging.getLogger("pattern_discovery")
+    
+    exact_count = len(patterns.get("exact_subtrees", Counter()))
+    abstract_count = len(patterns.get("abstract_algorithms", Counter()))
+    total_structures = len(patterns.get("hash_to_tree", {}))
+    
+    logger.info("\n" + "="*60)
+    logger.info("🔬 PATTERN DISCOVERY COMPLETE 🔬")
+    logger.info("="*60)
+    logger.info("📊 Statistics:")
+    logger.info("   Exact Patterns Found: %d", exact_count)
+    logger.info("   Abstract Algorithms: %d", abstract_count)
+    logger.info("   Total Unique Structures: %d", total_structures)
+    
+    exact_subtrees = patterns.get("exact_subtrees", Counter())
+    hash_to_tree = patterns.get("hash_to_tree", {})
+    
+    if exact_subtrees:
+        top_exact = exact_subtrees.most_common(1)[0]
+        logger.info("\n🌟 Most Common Exact Pattern:")
+        logger.info("   Appears %d times", top_exact[1])
+        if top_exact[0] in hash_to_tree:
+            subtree_str = str(hash_to_tree[top_exact[0]])[:80]
+            logger.info("   Structure: %s", subtree_str)
+    
+    abstract_algorithms = patterns.get("abstract_algorithms", Counter())
+    if abstract_algorithms:
+        top_abstract = abstract_algorithms.most_common(1)[0]
+        logger.info("\n🧠 Most Common Algorithm:")
+        logger.info("   Appears %d times", top_abstract[1])
+        logger.info("   (This pattern works across different metrics!)")
+    
+    logger.info("\n💡 The system is learning... evolving... becoming smarter!")
+    logger.info("="*60)
 

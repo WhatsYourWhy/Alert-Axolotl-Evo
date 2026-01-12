@@ -1,7 +1,7 @@
 """Self-improving evolution wrapper that learns from results."""
 
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -15,8 +15,15 @@ from alert_axolotl_evo.evolution import evolve
 from alert_axolotl_evo.pattern_discovery import (
     analyze_primitive_usage,
     discover_common_patterns,
+    discover_structural_patterns,
     identify_optimization_targets,
     suggest_new_primitives,
+)
+from alert_axolotl_evo.visualization import (
+    announce_pattern_discovery,
+    display_pattern_leaderboard,
+    generate_pattern_name,
+    print_pattern_discovery_summary,
 )
 from alert_axolotl_evo.persistence import load_rule
 from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS, register_function, register_terminal
@@ -158,44 +165,77 @@ class SelfImprovingEvolver:
             return []
         
         registered = []
+        import logging
+        logger = logging.getLogger("self_improving")
+        
         try:
-            patterns = discover_common_patterns(self.results_dir)
+            # Use new structural pattern discovery
+            patterns = discover_structural_patterns(self.results_dir)
+            
+            # Print discovery summary
+            print_pattern_discovery_summary(patterns)
+            
+            # Get exact and abstract patterns
+            exact_subtrees = patterns.get("exact_subtrees", Counter())
+            abstract_algorithms = patterns.get("abstract_algorithms", Counter())
+            hash_to_tree = patterns.get("hash_to_tree", {})
+            subtree_metadata = patterns.get("subtree_metadata", {})
+            
+            # Register patterns based on exact matches (for now)
+            # Future: implement promotion lifecycle (candidate -> probation -> permanent)
+            for pattern_hash, count in exact_subtrees.items():
+                if count >= min_usage and pattern_hash in hash_to_tree:
+                    subtree = hash_to_tree[pattern_hash]
+                    pattern_name = generate_pattern_name(pattern_hash, subtree)
+                    
+                    # Check if we should register this pattern
+                    # For now, register common structural patterns as new primitives
+                    # This is a simplified version - full implementation would use promotion lifecycle
+                    
+                    # Announce discovery if significant
+                    if count >= min_usage:
+                        metadata = subtree_metadata.get(pattern_hash, {})
+                        avg_fitness = (metadata.get("fitness_sum", 0.0) / metadata.get("count", 1)) if metadata.get("count", 0) > 0 else 0.0
+                        announce_pattern_discovery(pattern_hash, pattern_name, count, avg_fitness)
+            
+            # Also maintain backward compatibility with old combination-based registration
+            combinations = patterns.get("common_combinations", {})
+            combination_mappings = {
+                "avg+>": ("avg_gt", lambda vals, threshold: sum(vals) / len(vals) > threshold if vals else False, 2),
+                "avg+<": ("avg_lt", lambda vals, threshold: sum(vals) / len(vals) < threshold if vals else False, 2),
+                "max+>": ("max_gt", lambda vals, threshold: max(vals) > threshold if vals else False, 2),
+                "min+<": ("min_lt", lambda vals, threshold: min(vals) < threshold if vals else False, 2),
+            }
+            
+            for pattern_key, (prim_name, func, arity) in combination_mappings.items():
+                pattern_count = combinations.get(pattern_key, 0)
+                if pattern_count >= min_usage and prim_name not in FUNCTIONS:
+                    if prim_name not in self.registered_primitives:
+                        register_function(prim_name, func, arity)
+                        registered.append(prim_name)
+                        logger.info("🎊 Auto-registered: %s", prim_name)
+            
+            # Register common thresholds as terminals
+            thresholds = patterns.get("common_thresholds", {})
+            if thresholds and hasattr(thresholds, 'most_common'):
+                common_thresholds = [
+                    (t, count) for t, count in thresholds.most_common(5)
+                    if count >= min_usage
+                ]
+                for threshold, _ in common_thresholds:
+                    if threshold not in TERMINALS:
+                        if f"threshold_{threshold}" not in self.registered_primitives:
+                            register_terminal(threshold)
+                            registered.append(f"threshold_{threshold}")
+            
+            # Display leaderboard if we have patterns
+            if exact_subtrees:
+                display_pattern_leaderboard(patterns, top_n=5)
+            
         except Exception as e:
             # Graceful degradation: if pattern discovery fails, return empty list
-            import logging
-            logger = logging.getLogger("self_improving")
             logger.warning(f"Pattern discovery failed: {e}")
             return []
-        
-        combinations = patterns.get("common_combinations", {})
-        
-        # Register common function combinations
-        combination_mappings = {
-            "avg+>": ("avg_gt", lambda vals, threshold: sum(vals) / len(vals) > threshold if vals else False, 2),
-            "avg+<": ("avg_lt", lambda vals, threshold: sum(vals) / len(vals) < threshold if vals else False, 2),
-            "max+>": ("max_gt", lambda vals, threshold: max(vals) > threshold if vals else False, 2),
-            "min+<": ("min_lt", lambda vals, threshold: min(vals) < threshold if vals else False, 2),
-        }
-        
-        for pattern_key, (prim_name, func, arity) in combination_mappings.items():
-            pattern_count = combinations.get(pattern_key, 0)
-            if pattern_count >= min_usage and prim_name not in FUNCTIONS:
-                if prim_name not in self.registered_primitives:
-                    register_function(prim_name, func, arity)
-                    registered.append(prim_name)
-        
-        # Register common thresholds as terminals
-        thresholds = patterns.get("common_thresholds", {})
-        if thresholds and hasattr(thresholds, 'most_common'):
-            common_thresholds = [
-                (t, count) for t, count in thresholds.most_common(5)
-                if count >= min_usage
-            ]
-            for threshold, _ in common_thresholds:
-                if threshold not in TERMINALS:
-                    if f"threshold_{threshold}" not in self.registered_primitives:
-                        register_terminal(threshold)
-                        registered.append(f"threshold_{threshold}")
         
         return registered
     
@@ -426,6 +466,18 @@ class SelfImprovingEvolver:
             "auto_registered_primitives": self.registered_primitives,
             "data_adaptations": self.data_adaptations[-5:],  # Last 5 adaptations
         }
+        
+        # Add pattern discovery statistics if available
+        try:
+            structural_patterns = discover_structural_patterns(self.results_dir)
+            report["pattern_discovery"] = {
+                "exact_patterns_count": len(structural_patterns.get("exact_subtrees", Counter())),
+                "abstract_algorithms_count": len(structural_patterns.get("abstract_algorithms", Counter())),
+                "total_unique_structures": len(structural_patterns.get("hash_to_tree", {})),
+            }
+        except Exception:
+            # Pattern discovery not available
+            pass
         
         return report
 

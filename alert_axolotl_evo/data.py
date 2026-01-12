@@ -6,7 +6,7 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,8 @@ class CSVDataLoader(DataLoader):
             value_column: Column name for numeric values
             timestamp_column: Column name for timestamps (optional, not used in load)
             anomaly_column: Column name for anomaly labels (optional)
+                - If None: Explicitly means "no labels provided; auto-label if percentile is set"
+                - If specified but missing in file: Treated as missing column (auto-labeling will occur)
             auto_label_percentile: Percentile threshold for auto-labeling when anomaly_column is missing
                                   Values above this percentile are labeled as anomalies
         """
@@ -81,6 +83,9 @@ class CSVDataLoader(DataLoader):
         self.timestamp_column = timestamp_column
         self.anomaly_column = anomaly_column
         self.auto_label_percentile = auto_label_percentile
+        # Provenance metadata for label source tracking
+        self._label_source: Optional[str] = None  # "auto_percentile", "explicit", or None
+        self._label_threshold: Optional[float] = None  # Threshold used for auto-labeling
     
     def load(self) -> Tuple[List[float], List[bool]]:
         """
@@ -120,6 +125,10 @@ class CSVDataLoader(DataLoader):
                 threshold = np.quantile(raw_values, self.auto_label_percentile)
                 anomalies = [v > threshold for v in raw_values]
                 
+                # Set provenance metadata
+                self._label_source = "auto_percentile"
+                self._label_threshold = float(threshold)
+                
                 logger.warning(
                     "CSVDataLoader: anomaly column '%s' missing — auto-labeling top %.2f%% (threshold=%.2f)",
                     self.anomaly_column or "<not specified>",
@@ -133,14 +142,36 @@ class CSVDataLoader(DataLoader):
                 threshold = sorted_values[min(threshold_idx, len(sorted_values) - 1)]
                 anomalies = [v > threshold for v in raw_values]
                 
+                # Set provenance metadata
+                self._label_source = "auto_percentile"
+                self._label_threshold = float(threshold)
+                
                 logger.warning(
                     "CSVDataLoader: anomaly column '%s' missing — auto-labeling top %.2f%% (threshold=%.2f, numpy not available)",
                     self.anomaly_column or "<not specified>",
                     (1 - self.auto_label_percentile) * 100,
                     threshold
                 )
+        elif has_anomaly_column:
+            # Labels were explicitly provided
+            self._label_source = "explicit"
+            self._label_threshold = None
         
         return values, anomalies
+    
+    def get_label_provenance(self) -> dict:
+        """
+        Get provenance metadata about label source.
+        
+        Returns:
+            Dict with keys:
+            - label_source: "auto_percentile", "explicit", or None
+            - label_threshold: Threshold used for auto-labeling (if applicable)
+        """
+        return {
+            "label_source": self._label_source,
+            "label_threshold": self._label_threshold,
+        }
 
 
 class JSONDataLoader(DataLoader):

@@ -15,6 +15,7 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 
 ## Features
 
+- **Symbolic Evolutionary Economics**: This system uses symbolic evolutionary economics, not neural networks.
 - **Tree-based alert rules**: Programs are nested tuples like `('if_alert', ('>', ('avg', 'latency'), 100), 'High ping!')`
 - **Deterministic evolution**: Seeded data and selection ensure reproducible runs
 - **Gamified storytelling**: Births, battles, funerals, and champions are announced with flair

@@ -36,7 +36,17 @@ from alert_axolotl_evo.fitness import evaluate
 
 
 class SelfImprovingEvolver:
-    """Wrapper around evolution that learns from results and improves itself."""
+    """
+    Wrapper around evolution that learns from results and improves itself.
+    
+    DEPRECATED LEGACY PATHS (when enable_promotion_manager=True):
+    - auto_register_primitives(): Pattern discovery + visualization
+    - Terminal auto-registration
+    - Pattern discovery heuristics
+    
+    These are disabled when PromotionManager is enabled to prevent "economy leaks"
+    (unbudgeted primitives). The PromotionManager is the sole learning mechanism.
+    """
     
     def __init__(
         self,
@@ -94,7 +104,10 @@ class SelfImprovingEvolver:
         """
         # Auto-register primitives before evolution (if enabled and we have history)
         # CRITICAL: Disable legacy auto-registration when PromotionManager is enabled
-        # This prevents "economy leaks" (unbudgeted primitives)
+        # This prevents "economy leaks" (unbudgeted primitives).
+        # Legacy pattern discovery heuristics bypass the economic constraints (budget, lift, eviction)
+        # that PromotionManager enforces. When PromotionManager is active, it is the sole learning
+        # mechanism and all primitive registration must go through it.
         if (not self.enable_promotion_manager) and self.auto_register and len(self.history) >= 2:
             registered = self.auto_register_primitives()
             if registered:
@@ -257,6 +270,10 @@ class SelfImprovingEvolver:
     def auto_register_primitives(self, min_usage: Optional[int] = None) -> List[str]:
         """
         Automatically register new primitives based on discovered patterns.
+        
+        DEPRECATED: Disabled when enable_promotion_manager=True.
+        This method uses pattern discovery heuristics that bypass economic constraints.
+        When PromotionManager is enabled, use it as the sole learning mechanism instead.
         
         Args:
             min_usage: Minimum pattern occurrence count to trigger registration

@@ -74,6 +74,63 @@ Before proposing code changes, verify:
 - Does it add learning? If yes, does it include budget + eviction + causal lift?
 - Does it reduce explainability? If yes, it's out of scope.
 
+### Environment Repair vs Learning
+
+**Critical Distinction**: Data preparation (environment repair) is not model learning.
+
+- **Environment Repair**: Auto-labeling missing anomaly columns in CSV files is data preparation.
+  - This happens before fitness evaluation
+  - It synthesizes ground truth from raw data using percentile thresholds
+  - It is inspectable and logged (provenance metadata)
+  - It does not modify the model or learning mechanisms
+  
+- **Model Learning**: PromotionManager's macro promotion is actual learning.
+  - This happens during evolution via economic constraints
+  - It requires causal lift, evidence thresholds, and budget enforcement
+  - It modifies the active primitive library
+  - It is the only allowed learning mechanism when enabled
+
+Auto-labeling is environment repair, not knowledge injection. It preserves the system's economic discipline.
+
+### Economic Time Semantics
+
+The system uses **monotonic economic time** (`economy_tick`) that is independent of GP generation numbers.
+
+- **Semantics**: `economy_tick` represents "wall-clock runs" - it increments on every run attempt
+- **Monotonicity**: The tick always advances, even if market updates are skipped (small batch, warmup period)
+- **Purpose**: Enables correct ghost pruning - patterns age based on economic time, not GP generations
+- **Implementation**: `economy_tick` is used as `current_gen` in PromotionManager for `last_seen_gen` tracking
+
+This ensures that patterns not seen for N economic ticks are correctly identified as ghosts, regardless of whether those ticks were skipped due to batch-size guards or warmup periods.
+
+### What PromotionManager Is Allowed To Change
+
+**PromotionManager CAN modify:**
+- `active_library`: Dictionary of promoted macros (subject to `LIBRARY_BUDGET`)
+- Primitive registry: Register/unregister macro functions via `register_fn`/`unregister_fn`
+- Pattern statistics: Track `present_count`, `absent_count`, fitness sums for pattern variants
+
+**PromotionManager CANNOT modify:**
+- Core GP operators (crossover, mutation, selection)
+- Fitness function logic
+- Tree evaluation semantics
+- Base primitive registry (non-macro functions)
+- Evolution loop structure
+
+PromotionManager operates at the orchestration boundary, not within the evolution engine. It observes champions and promotes patterns, but does not interfere with the core GP mechanics.
+
+### What NOT to Do
+
+This system works because it is disciplined. Do not:
+
+- Add neural networks or learned weights
+- Cache "helpful" macros outside PromotionManager
+- Persist learned primitives outside PromotionManager
+- Auto-promote based on frequency alone (must show causal lift)
+- "Improve" lift math without understanding economic semantics
+- Bypass budget constraints for "useful" patterns
+- Create learning mechanisms that grow without eviction
+
 ---
 
 ## 🧭 Architectural Intent & Constraints

@@ -155,7 +155,13 @@ def fitness(
     data_config: Optional[DataConfig] = None,
     data_loader: Optional[DataLoader] = None,
 ) -> float:
-    """Compute fitness based on detection quality and parsimony."""
+    """
+    Compute fitness based on detection quality and parsimony.
+    
+    NOTE: fitness must be pure and side-effect free.
+    This function computes a score based on tree evaluation and data.
+    It does not modify global state, registries, or learning mechanisms.
+    """
     if fitness_config is None:
         fitness_config = FitnessConfig()
     if data_config is None:
@@ -167,6 +173,13 @@ def fitness(
             # Update seed for mock data loader
             data_loader.seed = seed + gen
         values, anomalies = data_loader.load()
+        
+        # Validate data loader output format
+        assert isinstance(values, list), "values must be a list"
+        assert isinstance(anomalies, list), "anomalies must be a list"
+        assert len(values) == len(anomalies), "values and anomalies must have same length"
+        assert all(isinstance(v, (int, float)) for v in values), "values must be numeric"
+        assert all(isinstance(a, bool) for a in anomalies), "anomalies must be boolean"
     else:
         # Fallback to generate_mock_data for backward compatibility
         values, anomalies = generate_mock_data(

@@ -53,6 +53,34 @@ Must not run competing learning systems in parallel.
 
 ## Required invariants (do not "simplify" these away)
 
+### Core Economic Invariants
+
+- **No unbudgeted learning**: All primitive registration must go through PromotionManager when enabled.
+  - Legacy pattern discovery heuristics are disabled when PromotionManager is active.
+  - No learning mechanism can grow without eviction constraints.
+
+- **Learning must pay rent**: New primitives/macros must demonstrate causal contribution.
+  - Must show present vs absent advantage (causal proxy, not correlation).
+  - Must survive shrinkage and sample size thresholds.
+  - Must fit under hard library budget with eviction rules.
+
+- **Time always advances**: Economic time is monotonic and wall-clock based.
+  - `economy_tick` represents "wall-clock runs" - increments on every run attempt.
+  - This ensures ghost pruning works: patterns age even if runs are skipped (small batch, warmup, etc.).
+  - The tick advances regardless of whether market updates occurred, so `(current_gen - last_seen_gen)` correctly measures pattern age.
+
+- **Evidence before eviction**: Patterns cannot be evicted without sufficient evidence.
+  - Ghost pruning requires minimum total observations (`MIN_EVIDENCE_FOR_GHOST`).
+  - Harmful pruning requires minimum total observations (`MIN_EVIDENCE_FOR_HARM`).
+  - This prevents premature eviction during sparse periods or low-sample chaos.
+
+- **Environment repair ≠ learning**: Data preparation is not model learning.
+  - Auto-labeling missing anomaly columns is environment repair (data preparation).
+  - It happens before fitness evaluation and does not modify learning mechanisms.
+  - It is inspectable and logged (provenance metadata).
+
+### Technical Invariants
+
 - Absent stats must not be computed by enumerating non-presence.
   - Use complement updates for performance and correct semantics.
 - Promoted macros must remain analyzable.
@@ -62,10 +90,6 @@ Must not run competing learning systems in parallel.
   - Library size is capped; eviction and challenger replacement are required.
 - Promotion is reversible.
   - Underperforming or unused macros must be removable via unregister.
-- Economic time semantics are monotonic and wall-clock based.
-  - `economy_tick` (or `economy_run_idx`) represents "wall-clock runs" - increments on every run attempt.
-  - This ensures ghost pruning works: patterns age even if runs are skipped (small batch, warmup, etc.).
-  - The tick advances regardless of whether market updates occurred, so `(current_gen - last_seen_gen)` correctly measures pattern age.
 
 ## Safe contribution checklist for AI edits
 

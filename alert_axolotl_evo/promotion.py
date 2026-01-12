@@ -198,6 +198,10 @@ class PromotionManager:
             if is_ghost or is_harmful:
                 self._retire(variant, unregister_fn)
         
+        # Defensive invariant: library should never exceed budget
+        assert len(self.active_library) <= self.LIBRARY_BUDGET, \
+            f"Library budget violation: {len(self.active_library)} > {self.LIBRARY_BUDGET}"
+        
         return promoted
 
     # --- Helpers ---

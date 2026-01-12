@@ -91,6 +91,78 @@ Must not run competing learning systems in parallel.
 - Promotion is reversible.
   - Underperforming or unused macros must be removable via unregister.
 
+### Semantic Invariants
+
+- **Root must be `if_alert`**: All evolved rules must have `if_alert` at root.
+  - Enforced by `is_valid_alert_rule()` in `tree.py`.
+  - Invalid trees return fitness -100.0.
+- **Condition must evaluate to `bool` or invalid**: Conditions must return `bool`, not truthy values.
+  - Type-strict evaluation: `type(x) is bool` not `bool(x)`.
+  - Invalid conditions return `("__INVALID_CONDITION__", ...)` sentinel.
+- **Message terminals cannot appear in conditions**: Message strings cannot be used as conditions.
+  - Enforced by `is_boolean_expression()` in `tree.py`.
+- **Invalid outputs > threshold (50%) ⇒ hard fail**: If invalid_rate > 0.5, return -100.0.
+  - Soft penalty (0.5 * invalid_rate) applies below 50% threshold.
+  - Enforced in `fitness()` function.
+
+### Fitness Invariants
+
+- **Champion must beat baselines (or warn/fail)**: Evolved champions must strictly dominate baselines.
+  - Always-false, always-true, and random baselines must be beaten.
+  - `print_fitness_comparison()` must warn if champion doesn't beat all baselines.
+  - This is a critical sanity check for alignment.
+- **Use `node_count` for bloat penalty**: Parsimony pressure via `bloat_penalty * node_count(tree)`.
+  - Prevents unbounded tree growth.
+  - Enforced in `fitness()` function.
+- **Explicit penalties for always-true / never-alert**: Degenerate solutions must be penalized.
+  - Always-true: Heavy penalty scaling with dataset size (lines 593-599).
+  - Never-alert: Explicit -5.0 penalty (line 570).
+  - Self-comparison: -10.0 penalty (line 566).
+- **Baseline comparison must run and validate**: `print_fitness_comparison()` must be called.
+  - Automatically called during evolution.
+  - Can be called manually for validation.
+- **Fitness function must be pure**: No side effects, no global state mutation.
+  - `fitness()` must be deterministic and replayable.
+  - Must not modify registries, learning mechanisms, or global state.
+
+### Data Invariants
+
+- **`consistent_data=True` means identical dataset across generations**: Same seed = same data.
+  - When `consistent_data=True`, use `seed` (not `seed + gen`).
+  - When `consistent_data=False`, use `seed + gen` (legacy behavior).
+  - Enforced in `fitness()` and `fitness_breakdown()`.
+- **Auto-labeling is "environment repair," must log provenance**: Data preparation is not learning.
+  - Auto-labeling happens before fitness evaluation.
+  - Must not modify learning mechanisms.
+  - Must be inspectable and logged (provenance metadata).
+- **Mock generator must produce known anomaly rate and shapes**: Mock data must be deterministic.
+  - Anomaly count must match `data_config.anomaly_count`.
+  - Anomaly multiplier must match `data_config.anomaly_multiplier`.
+  - Seed determines exact anomaly positions.
+- **Data loader output format must be validated**: Output must be `(List[float], List[bool])`.
+  - Assertions in `fitness()` validate format.
+  - Values must be numeric, anomalies must be boolean.
+  - Lengths must match.
+
+### Economy Invariants
+
+- **PromotionManager is sole learning path when enabled**: No competing learning systems.
+  - When `enable_promotion_manager=True`, legacy auto-register is disabled.
+  - All primitive registration must go through PromotionManager.
+  - No learning mechanism can grow without eviction constraints.
+- **Monotonic economy tick semantics**: `economy_tick` always advances.
+  - Represents "wall-clock runs" - increments on every run attempt.
+  - Advances regardless of whether market updates occurred.
+  - Enables correct ghost pruning (patterns age based on economic time).
+- **Budget hard cap, challenger swap rules**: Library size is strictly capped.
+  - Hard cap on active macros (default: 50, configurable via `library_budget`).
+  - Challenger replacement when at budget (10% margin).
+  - Eviction rules enforced (ghost pruning, harmful pruning).
+- **Evidence floors for pruning**: Patterns cannot be evicted without sufficient evidence.
+  - Ghost pruning requires `MIN_EVIDENCE_FOR_GHOST` total observations.
+  - Harmful pruning requires `MIN_EVIDENCE_FOR_HARM` total observations.
+  - Prevents premature eviction during sparse periods.
+
 ## Safe contribution checklist for AI edits
 
 Before proposing code changes, verify:

@@ -201,20 +201,166 @@ Alignment drift occurs when:
    - Do they converge to useful rules?
    - Or do they collapse to degenerate solutions?
 
+## Operating Region Validation
+
+### What is the Operating Region?
+
+The operating region defines explicit bounds where evolved rules must operate to be considered operationally useful. See [`docs/FITNESS_ALIGNMENT.md`](FITNESS_ALIGNMENT.md) for the complete operating region definition.
+
+### Operating Region Bounds
+
+| Metric | Lower Bound | Upper Bound |
+|--------|-------------|-------------|
+| Alert Rate | 0.2% (0.002) | 20% (0.20) |
+| Precision | 30% (0.30) | 100% (1.0) |
+| FPR | 0% (0.0) | 15% (0.15) |
+| Recall | 10% (0.10) or TP > 0 | 100% (1.0) |
+| Invalid Rate | 0% (0.0) | 50% (0.50) |
+
+### How to Validate Operating Region
+
+```python
+from alert_axolotl_evo.fitness import fitness_breakdown
+
+breakdown = fitness_breakdown(champion_tree, seed=42, gen=10)
+
+# Validate all operating region bounds
+assert breakdown['alert_rate'] >= 0.002, f"Alert rate {breakdown['alert_rate']:.4f} below 0.2%"
+assert breakdown['alert_rate'] <= 0.20, f"Alert rate {breakdown['alert_rate']:.4f} above 20%"
+assert breakdown['precision'] >= 0.3, f"Precision {breakdown['precision']:.3f} below 30%"
+assert breakdown['fpr'] <= 0.15, f"FPR {breakdown['fpr']:.3f} above 15%"
+assert breakdown['recall'] >= 0.1 or breakdown['tp'] > 0, "Recall below 10% and TP=0"
+assert breakdown['invalid_rate'] <= 0.5, f"Invalid rate {breakdown['invalid_rate']:.3f} above 50%"
+
+print("✓ All operating region constraints met")
+```
+
+### Operating Region Violations
+
+If a rule violates operating region bounds:
+- **Investigate**: Why did it violate? Is it a bug or legitimate edge case?
+- **Check penalties**: Are alignment penalties being applied?
+- **Review thresholds**: Are thresholds appropriate for your use case?
+- **Consider context**: Some violations may be acceptable in specific contexts (document why)
+
+## Metric Gaming Detection
+
+### What is Metric Gaming?
+
+Metric gaming occurs when rules optimize one metric by violating others or exploiting mock data artifacts. See [`docs/FITNESS_ALIGNMENT.md`](FITNESS_ALIGNMENT.md) for complete definition.
+
+### How to Detect Gaming
+
+```python
+from alert_axolotl_evo.fitness import fitness_breakdown
+
+breakdown = fitness_breakdown(champion_tree, seed=42, gen=10)
+
+# Check for gaming patterns
+warnings = []
+
+# Gaming: High precision but barely alerting
+if breakdown['precision'] >= 0.5 and breakdown['alert_rate'] < 0.002:
+    warnings.append("GAMING: High precision but alert rate < 0.2% (too conservative)")
+
+# Gaming: High recall but too noisy
+if breakdown['recall'] >= 0.8 and breakdown['fpr'] > 0.15:
+    warnings.append("GAMING: High recall but FPR > 15% (too noisy)")
+
+# Gaming: Simple max threshold (exploiting mock data)
+import ast
+tree_str = str(champion_tree)
+if 'max' in tree_str and 'latency' in tree_str and tree_str.count('>') == 1:
+    warnings.append("WARNING: Simple max threshold - may be exploiting mock data artifacts")
+
+# Gaming: Overfitting (test on multiple seeds)
+fitness_seed_42 = fitness(champion_tree, seed=42, gen=10)
+fitness_seed_43 = fitness(champion_tree, seed=43, gen=10)
+fitness_delta = abs(fitness_seed_42 - fitness_seed_43)
+if fitness_delta > 5.0:  # Large variance across seeds
+    warnings.append("WARNING: Large fitness variance across seeds (possible overfitting)")
+
+if warnings:
+    print("⚠️  Metric Gaming Detected:")
+    for warning in warnings:
+        print(f"   - {warning}")
+else:
+    print("✓ No metric gaming detected")
+```
+
+### Gaming Patterns to Watch For
+
+1. **Precision Gaming**: Rules that optimize precision by barely alerting
+   - Alert rate < 0.2% but precision > 50%
+   - Solution: Alert-rate band penalty should catch this
+
+2. **Mock Data Artifacts**: Rules that exploit mock data generator
+   - Always using `max(latency) >= T` (works because anomalies are "big spikes")
+   - Solution: Improve mock data generator or add holdout evaluation
+
+3. **Overfitting**: Rules that work only on one data seed
+   - Large fitness variance across seeds
+   - Solution: Test on multiple seeds, add holdout evaluation
+
+4. **Single-Metric Optimization**: Rules that optimize one metric at expense of others
+   - High precision but terrible recall
+   - High recall but terrible precision
+   - Solution: Operating region constraints should prevent this
+
+### Mock Data Artifact Detection
+
+```python
+# Test if rule is exploiting mock data artifacts
+breakdown = fitness_breakdown(champion_tree, seed=42, gen=0)
+
+# Check if rule is just a simple max threshold
+tree_str = str(champion_tree)
+is_simple_max = (
+    'max' in tree_str and 
+    'latency' in tree_str and 
+    tree_str.count('>') == 1 and
+    tree_str.count('if_alert') == 1
+)
+
+if is_simple_max:
+    print("⚠️  WARNING: Rule is simple max threshold")
+    print("   This may be exploiting mock data artifacts (anomalies are 'big spikes')")
+    print("   Consider: Improving mock data generator or adding holdout evaluation")
+```
+
 ## Validation Checklist
 
 Use this checklist to validate alignment:
 
+### Baseline Validation
 - [ ] Champions beat all baselines (always-false, always-true, random)
+- [ ] Baseline comparison runs and validates correctly
+- [ ] No warnings about champions not beating baselines
+
+### Operating Region Validation
+- [ ] Alert rate in [0.2%, 20%] for evolved champions
 - [ ] Precision ≥ 30% for evolved champions
 - [ ] FPR ≤ 15% for evolved champions
-- [ ] Alert rate in [0.2%, 20%] for evolved champions
 - [ ] Recall ≥ 10% or TP > 0 for evolved champions
-- [ ] No degenerate solutions (always-true/always-false) win
-- [ ] Fitness scores are positive and meaningful
+- [ ] Invalid rate ≤ 50% (prefer 0%) for evolved champions
+
+### Metric Gaming Detection
+- [ ] No precision gaming (high precision but alert rate < 0.2%)
+- [ ] No recall gaming (high recall but FPR > 15%)
+- [ ] No mock data artifact exploitation (simple max thresholds)
+- [ ] No overfitting (rules work across multiple seeds)
 - [ ] Metrics are balanced (not just one metric optimized)
+
+### Degenerate Solution Prevention
+- [ ] No degenerate solutions (always-true/always-false) win
+- [ ] Self-comparison detection working
+- [ ] No-alert penalty applied correctly
+
+### General Health
+- [ ] Fitness scores are positive and meaningful
 - [ ] Threshold changes have predictable effects
 - [ ] Automated tests pass
+- [ ] Evolution converges to useful rules (not degenerate)
 
 ## Troubleshooting
 
@@ -264,12 +410,43 @@ Use this checklist to validate alignment:
 - Precision pressure too strong
 - Recall floor too weak
 - F-beta weighting inappropriate
+- Metric gaming (optimizing one metric at expense of others)
 
 **Solutions**:
-1. Adjust F-beta parameter (beta in FitnessConfig)
-2. Balance precision and recall penalties
-3. Consider multi-objective optimization
-4. Review operational requirements (which matters more?)
+1. Check operating region validation - rules must meet ALL bounds
+2. Adjust F-beta parameter (beta in FitnessConfig)
+3. Balance precision and recall penalties
+4. Consider multi-objective optimization
+5. Review operational requirements (which matters more?)
+6. Check for metric gaming patterns (see Metric Gaming Detection section)
+
+### Problem: Rules exploit mock data artifacts
+
+**Possible Causes**:
+- Mock data generator too simple (only "big spikes")
+- Rules collapse to simple `max(latency) >= T` thresholds
+- Overfitting to mock data shapes
+
+**Solutions**:
+1. Improve mock data generator (add sustained elevation, variance anomalies, etc.)
+2. Add holdout evaluation (train on one seed, validate on another)
+3. Test rules on multiple seeds to detect overfitting
+4. Consider penalizing simple max thresholds if they dominate
+5. Acknowledge limitation: Current mock data favors max() rules
+
+### Problem: Operating region violations
+
+**Possible Causes**:
+- Alignment mechanisms not working
+- Thresholds inappropriate for use case
+- Data characteristics different from expected
+
+**Solutions**:
+1. Verify alignment penalties are being applied (check `fitness_breakdown()`)
+2. Review operating region bounds - are they appropriate for your use case?
+3. Check if data has expected characteristics (anomaly rate, shapes)
+4. Consider adjusting thresholds if operational requirements differ
+5. Document any legitimate violations (why they're acceptable)
 
 ## Continuous Validation
 

@@ -62,7 +62,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Rules became more deployment-feasible, but precision was still unconstrained.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 483-497
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 591-601
 
 ---
 
@@ -78,7 +78,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Rules started meeting operational precision requirements.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 499-510
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 616-627
 
 ---
 
@@ -94,7 +94,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Complete operational constraint coverage for false positives.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 512-514
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 643-645
 
 ---
 
@@ -109,7 +109,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Balanced alignment across all operational dimensions.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 516-520
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 662-664
 
 ---
 

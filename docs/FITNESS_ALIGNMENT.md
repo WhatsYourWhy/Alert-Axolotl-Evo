@@ -214,6 +214,172 @@ if invalid_rate > 0.0:
 
 ---
 
+## Intended Operating Region
+
+The fitness alignment mechanisms define an **explicit operating region** where evolved rules must operate to be considered operationally useful. Rules outside this region are penalized or rejected.
+
+### Operating Region Bounds
+
+A rule is **operationally aligned** if it meets ALL of the following constraints:
+
+| Metric | Lower Bound | Upper Bound | Justification |
+|--------|-------------|-------------|---------------|
+| **Alert Rate** | 0.2% (0.002) | 20% (0.20) | Deployment feasibility - too low = never fires, too high = too noisy |
+| **Precision** | 30% (0.30) | 100% (1.0) | Human-paged alert cost model - below 30% is operationally costly |
+| **FPR** | 0% (0.0) | 15% (0.15) | Operational noise tolerance - above 15% causes alert fatigue |
+| **Recall** | 10% (0.10) or TP > 0 | 100% (1.0) | Minimum usefulness - must detect at least some anomalies |
+| **Invalid Rate** | 0% (0.0) | 50% (0.50) | Semantic validity - above 50% = hard fail, prefer 0% |
+
+### Operating Region Enforcement
+
+- **Within bounds**: Rules that meet all constraints are rewarded (higher fitness)
+- **Outside bounds**: Rules that violate constraints are penalized (lower fitness)
+- **Hard gates**: Some violations cause immediate rejection (invalid_rate > 50%, always-true collapse)
+
+### Why Explicit Bounds Matter
+
+Without explicit operating region definitions, the system can drift into:
+- **Metric gaming**: Rules that optimize one metric by violating others
+- **Overfitting**: Rules that work only on synthetic data shapes
+- **Degenerate solutions**: Rules that technically "win" but are operationally useless
+
+The operating region ensures that "high fitness" means "meets all operational constraints," not just "optimizes one metric."
+
+---
+
+## Valid Improvement vs Metric Gaming
+
+### What is Valid Improvement?
+
+A rule demonstrates **valid improvement** if it:
+- Meets ALL operating region constraints (alert rate, precision, FPR, recall, invalid rate)
+- Beats baselines across ALL metrics (not just one)
+- Works across multiple data seeds (not overfit to one mock world)
+- Uses non-trivial logic (not just `max(latency) >= T`)
+
+### What is Metric Gaming?
+
+A rule is **gaming metrics** if it:
+- Optimizes precision by barely alerting (<0.2% alert rate)
+- Overfits to synthetic anomaly shapes (only works on one data seed)
+- Exploits mock data generator artifacts (e.g., always using `max()` because anomalies are "big spikes")
+- Collapses to simple thresholds that work only in mock world
+- Violates operating region bounds to optimize a single metric
+
+### Warning Signs of Metric Gaming
+
+**Red Flags** (investigate immediately):
+- High precision but alert rate < 0.2% (too conservative, barely fires)
+- High recall but FPR > 15% (too noisy, operational fatigue)
+- Rules that only work on one data seed (overfitting)
+- Rules that collapse to simple `max(latency) >= T` (exploiting mock data artifacts)
+- Rules that beat baselines on one metric but fail on others
+
+**Healthy Signs** (alignment working):
+- Rules meet all operating region constraints
+- Rules beat baselines across all metrics
+- Rules work across multiple data seeds
+- Rules use diverse logic (not just max thresholds)
+- Metrics are balanced (good precision AND recall AND reasonable alert rate)
+
+### How to Detect Gaming
+
+1. **Baseline Comparison**: If champion doesn't beat all baselines, investigate
+2. **Multi-Seed Validation**: Test rule on different seeds - if it fails, it's overfit
+3. **Operating Region Check**: Verify all metrics are within bounds
+4. **Logic Inspection**: If rule is just `max(latency) >= T`, it may be exploiting mock data
+5. **Metric Balance**: If one metric is optimized at expense of others, it's gaming
+
+### Example: Valid vs Gaming
+
+**Valid Rule**:
+```
+if_alert(
+  and(
+    >(max(latency), 75),
+    <(avg(latency), 200)
+  ),
+  "High latency spike detected"
+)
+```
+- Alert rate: 5.2% (within bounds)
+- Precision: 45% (meets threshold)
+- FPR: 8% (within bounds)
+- Recall: 60% (meets threshold)
+- Works on multiple seeds
+
+**Gaming Rule**:
+```
+if_alert(
+  >(max(latency), 10000),
+  "Extreme threshold"
+)
+```
+- Alert rate: 0.1% (below 0.2% - too conservative)
+- Precision: 100% (high, but by barely alerting)
+- FPR: 0% (low, but because it never fires)
+- Recall: 0% (doesn't detect anything)
+- Only works because mock anomalies are "big spikes"
+
+---
+
+## Mock Data Realism and Evolution Honesty
+
+### The Critical Constraint
+
+**The mock data generator is part of the objective function.** If the generator is wrong, evolution is pointless.
+
+This is not a side quest—it's a core constraint. Evolved rules that work only because of mock data artifacts are not operationally useful.
+
+### Current Limitations
+
+The current mock data generator produces anomalies as **"big spikes"** (multiplier-based elevation). This creates a strong bias toward:
+
+- `max(latency) >= T` rules (always dominate)
+- Simple threshold logic (works because anomalies are obvious)
+- Overfitting to spike patterns (doesn't generalize)
+
+### Why This Matters
+
+If anomalies are always "big spikes," then:
+- `max(latency) >= 75` will always win
+- More sophisticated logic is unnecessary
+- Evolution learns mock data artifacts, not real patterns
+- Rules won't generalize to real-world data
+
+### Future Improvements Needed
+
+To make evolution honest, the mock data generator needs:
+
+1. **Sustained moderate elevation**: Anomalies that are elevated but not spikes
+2. **Variance-based anomalies**: Anomalies in variance, not just magnitude
+3. **Distribution shift**: Anomalies that change distribution without max spike
+4. **Seasonal bursts / diurnal patterns**: Time-based anomaly patterns
+5. **Multiple anomaly types**: Mix of spike, sustained, variance, distribution shifts
+
+### Holdout Evaluation (Future Enhancement)
+
+**The cleanest way to keep evolution honest** is holdout evaluation:
+
+- **Train**: Evolve on one generated dataset (seed family A)
+- **Validate**: Score on second dataset (seed family B, same parameters, different noise realization)
+- **Prevents**: Overfitting to one mock world
+- **Ensures**: Rules generalize across data realizations
+
+This is the most important future enhancement for preventing mock data artifacts from controlling evolution.
+
+### Current Mitigations
+
+Until holdout evaluation is implemented:
+- Alert-rate bands prevent rules that barely fire (precision gaming)
+- Recall floors prevent rules that never detect (conservative gaming)
+- Baseline comparison catches degenerate solutions
+- Operating region constraints prevent single-metric optimization
+
+But the fundamental issue (mock data artifacts) remains until the generator is improved or holdout evaluation is added.
+
+---
+
 ## Implementation Details
 
 ### Code Structure

@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -690,4 +691,173 @@ def test_performance_report_new_fields():
         assert len(report["auto_registered_primitives"]) > 0
         assert isinstance(report["data_adaptations"], list)
         assert len(report["data_adaptations"]) > 0
+
+
+class TestPromotionManagerIntegration:
+    """Test Promotion Manager integration with SelfImprovingEvolver."""
+    
+    def test_enable_promotion_manager_init(self):
+        """Test that Promotion Manager can be enabled on init."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True,
+                library_budget=20
+            )
+            assert evolver.enable_promotion_manager is True
+            assert evolver.promotion_manager is not None
+            assert evolver.promotion_manager.LIBRARY_BUDGET == 20
+    
+    def test_promotion_manager_disabled_by_default(self):
+        """Test that Promotion Manager is disabled by default."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(results_dir=Path(tmpdir))
+            assert evolver.enable_promotion_manager is False
+            assert evolver.promotion_manager is None
+    
+    def test_economy_tick_initialization(self):
+        """Test that economy_tick is initialized to 0."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True
+            )
+            assert evolver.economy_tick == 0
+    
+    def test_promotion_manager_in_performance_report(self):
+        """Test that promotion manager stats appear in performance report."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True
+            )
+            
+            report = evolver.get_performance_report()
+            
+            # Should have promotion_manager section
+            assert "promotion_manager" in report
+            pm_stats = report["promotion_manager"]
+            assert "active_macros_count" in pm_stats
+            assert "promoted_macros" in pm_stats
+            assert "candidate_families" in pm_stats
+            assert "library_budget" in pm_stats
+    
+    def test_promotion_manager_not_in_report_when_disabled(self):
+        """Test that promotion manager stats don't appear when disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=False
+            )
+            
+            report = evolver.get_performance_report()
+            
+            # Should not have promotion_manager section
+            if "promotion_manager" in report:
+                assert report["promotion_manager"].get("status") == "PromotionManager not enabled"
+    
+    def test_legacy_auto_register_disabled_with_pm(self):
+        """Test that legacy auto-register is disabled when PM is enabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True,
+                auto_register=True  # Would normally trigger legacy path
+            )
+            
+            # Add history to trigger auto-register condition
+            # Need proper config structure
+            config_dict = Config().to_dict()
+            evolver.history = [
+                {"fitness": 1.0, "rule_complexity": 5, "config": config_dict},
+                {"fitness": 2.0, "rule_complexity": 6, "config": config_dict}
+            ]
+            
+            # Create rule files
+            for i in range(5):
+                rule_file = evolver.results_dir / f"run_{i}_champion.json"
+                save_rule(
+                    ("if_alert", (">", ("avg", "latency"), 100), "alert"),
+                    fitness=8.0 + i,
+                    generation=10,
+                    output_path=rule_file,
+                )
+            
+            # Mock evolve to avoid actual evolution
+            with patch('alert_axolotl_evo.self_improving.evolve'):
+                with patch('alert_axolotl_evo.self_improving.load_rule') as mock_load:
+                    mock_load.return_value = {
+                        "fitness": 2.0,
+                        "generation": 1,
+                        "metadata": {"node_count": 5, "hash": "test"}
+                    }
+                    
+                    # Check that avg_gt is not registered before
+                    assert "avg_gt" not in FUNCTIONS
+                    
+                    config = Config()
+                    evolver.run_and_learn(config, "test_run")
+                    
+                    # Legacy auto-register should not have run
+                    # avg_gt should still not be registered
+                    assert "avg_gt" not in FUNCTIONS
+    
+    def test_promotion_manager_processing_after_evolution(self):
+        """Test that promotion manager processes champions after evolution."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True,
+                library_budget=10,
+                min_promo_batch=2
+            )
+            
+            config = Config()
+            config.evolution.generations = 2
+            config.evolution.pop_size = 10
+            
+            # Mock evolve to create checkpoint
+            with patch('alert_axolotl_evo.self_improving.evolve'):
+                checkpoint_file = evolver.results_dir / "checkpoint_test_run.json"
+                checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                import json
+                checkpoint_data = {
+                    "generation": 1,
+                    "seed": 42,
+                    "champion_history": [
+                        [("if_alert", (">", ("avg", "latency"), 100), "alert"), 5.0],
+                        [("if_alert", (">", ("avg", "latency"), 100), "alert"), 6.0],
+                    ],
+                    "champion": ("if_alert", (">", ("avg", "latency"), 100), "alert"),
+                    "champion_fitness": 6.0,
+                    "config": config.to_dict()
+                }
+                
+                with open(checkpoint_file, 'w') as f:
+                    json.dump(checkpoint_data, f)
+                
+                with patch('alert_axolotl_evo.self_improving.load_rule') as mock_load:
+                    mock_load.return_value = {
+                        "fitness": 6.0,
+                        "generation": 1,
+                        "metadata": {"node_count": 5, "hash": "test"}
+                    }
+                    
+                    initial_tick = evolver.economy_tick
+                    evolver.run_and_learn(config, "test_run")
+                    
+                    # Economy tick should have advanced
+                    assert evolver.economy_tick > initial_tick
+    
+    def test_promoted_macros_tracking(self):
+        """Test that promoted macros are tracked."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evolver = SelfImprovingEvolver(
+                results_dir=Path(tmpdir),
+                enable_promotion_manager=True
+            )
+            
+            assert isinstance(evolver.promoted_macros, list)
+            assert len(evolver.promoted_macros) == 0
 

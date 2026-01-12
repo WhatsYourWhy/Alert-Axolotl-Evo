@@ -91,42 +91,82 @@ if alert:
     # Send to your monitoring system
 ```
 
-### 3. Self-Improving Evolution with Economic Learning
+### 3. Self-Improving Evolution with Economic Learning (Promotion Manager)
 
-```bash
-# Enable PromotionManager (economic learning system)
-python -m alert_axolotl_evo.main --self-improving --enable-promotion-manager
+The Promotion Manager implements "Evolutionary Economics" - patterns must demonstrate causal value to be promoted as reusable macros. This system discovers common algorithm structures and promotes them through a lifecycle: candidate → active → retired.
 
-# Customize economic parameters
-python -m alert_axolotl_evo.main \
-    --self-improving \
-    --enable-promotion-manager \
-    --library-budget 20 \
-    --min-promo-batch 4 \
-    --promo-warmup-ticks 3
-```
-
-The PromotionManager implements "Evolutionary Economics" - patterns must demonstrate causal value to be promoted as macros. See `docs/design_contract.md` for details.
+#### Basic Usage
 
 ```python
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.config import Config
 from pathlib import Path
 
-# Enable economic learning
+# Enable Promotion Manager (economic learning system)
 evolver = SelfImprovingEvolver(
     results_dir=Path("evolution_results"),
-    enable_promotion_manager=True,
-    library_budget=20,
-    min_promo_batch=4,
-    promo_warmup_ticks=3,
+    enable_promotion_manager=True,  # Enable economic learning
+    library_budget=50,              # Maximum active macros (default: 50)
 )
 
 config = Config()
-for i in range(10):
+config.evolution.pop_size = 30
+config.evolution.generations = 10
+
+# Run multiple evolutions - system learns and promotes patterns
+for i in range(5):
     result = evolver.run_and_learn(config, f"run_{i}")
-    evolver.print_market_status()  # View economic activity
+    print(f"Run {i+1}: Fitness {result['fitness']:.2f}")
+    
+    # Check promotion stats
+    report = evolver.get_performance_report()
+    if "promotion_manager" in report:
+        pm_stats = report["promotion_manager"]
+        print(f"  Active macros: {pm_stats['active_macros_count']}")
+        print(f"  Promoted this run: {pm_stats['promoted_macros']}")
 ```
+
+#### How It Works
+
+1. **Pattern Discovery**: After each evolution, the system analyzes champions using Merkle hashing to find common subtrees
+2. **Statistical Validation**: Patterns must show causal lift (better performance when present vs absent) with shrinkage to prevent overfitting
+3. **Promotion**: High-performing patterns are compiled into 0-arity macros and registered
+4. **Budget Enforcement**: System maintains a hard cap on active macros (default: 50)
+5. **Pruning**: Unused macros (ghosts) and harmful macros are automatically retired
+
+#### Configuration Options
+
+```python
+evolver = SelfImprovingEvolver(
+    enable_promotion_manager=True,
+    library_budget=20,              # Smaller budget for tighter control
+    # Note: Legacy auto_register is automatically disabled when PM is enabled
+    # to prevent "economy leaks" (unbudgeted primitives)
+)
+```
+
+#### Viewing Economic Activity
+
+```python
+# Get performance report with promotion stats
+report = evolver.get_performance_report()
+
+if "promotion_manager" in report:
+    pm = report["promotion_manager"]
+    print(f"Active Macros: {pm['active_macros_count']}/{pm['library_budget']}")
+    print(f"Promoted Macros: {pm['promoted_macros']}")
+    print(f"Candidate Families: {pm['candidate_families']}")
+```
+
+#### Understanding the Economy
+
+- **Economy Tick**: Monotonic counter that advances with each run (independent of GP generation)
+- **Marginal Value**: Patterns must be at least 2% better than average to be promoted
+- **Challenger Replacement**: New patterns must beat worst active by 10% margin to replace it
+- **Ghost Pruning**: Macros unused for 15+ ticks are retired
+- **Harmful Pruning**: Macros with lift < 0.99 are retired
+
+See `ARCHITECTURE.md` for the complete design contract and economic model.
 
 ### 4. Continuous Evolution with Checkpoints
 

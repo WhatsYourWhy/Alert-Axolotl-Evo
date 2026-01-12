@@ -1,11 +1,18 @@
 """
-Long Economy Test
+Long Economy Test - Extended Integration Test for Promotion Manager.
 
-Runs a disciplined long test to verify the economy actually works:
+This is an integration test script (not a unit test) that runs extended evolution
+to verify long-term economic stability and promotion/eviction behavior.
+
+Verifies:
 - Stable batch size (>= min_promo_batch)
 - Small warmup (2 ticks)
 - Enough ticks to hit MIN_SAMPLES (20)
-- Verify: at least one promotion, at least one eviction, stable library size
+- At least one promotion, at least one eviction, stable library size
+
+Run with: python test_long_economy.py
+
+Note: This creates test artifacts in test_long_economy_results/ directory.
 """
 import logging
 from pathlib import Path

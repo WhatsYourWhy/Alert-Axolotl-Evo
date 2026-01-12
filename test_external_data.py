@@ -1,4 +1,11 @@
-"""Quick test to verify external data injection works."""
+"""
+Quick Integration Test for External Data Injection.
+
+This is an integration test script that verifies custom DataLoader implementations
+work correctly with the evolution system.
+
+Run with: python test_external_data.py
+"""
 from alert_axolotl_evo.data import DataLoader
 from alert_axolotl_evo.evolution import evolve
 from alert_axolotl_evo.config import Config

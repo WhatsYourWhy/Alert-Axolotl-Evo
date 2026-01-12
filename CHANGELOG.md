@@ -2,6 +2,70 @@
 
 All notable changes to Alert-Axolotl-Evo will be documented in this file.
 
+## [1.3.0] - 2026-01-11
+
+### Added
+- **Promotion Manager V4**: Economic learning system with macro promotion lifecycle
+  - `compiler.py`: `PrimitiveCompiler` class for compiling subtrees into 0-arity macros
+  - `promotion.py`: `PromotionManager` class with V4 logic
+  - **Pattern Discovery**: Uses Merkle hashing for structural pattern identification
+  - **Family/Variant Model**: Groups patterns by normalized structure (family) and tracks specific instances (variants)
+  - **Statistical Shrinkage**: Causal lift calculation with shrinkage (k=50) to prevent overfitting
+  - **Complement Method**: O(P) efficient stats updates using Total - Present = Absent
+  - **Budget Enforcement**: Hard cap on active macros (default: 50) with 10% challenger margin
+  - **Pruning**: Removes ghosts (unused 15+ generations) and harmful macros (lift < 0.99)
+  - **Introspection**: Macros expand via `subtree_definition` attribute for pattern discovery
+  - **Economic Constraints**: Enforces "learning must pay rent" philosophy
+- **Generic Function Dispatch**: Refactored `fitness.py` evaluator to support dynamic function registration
+  - Replaced hardcoded if/elif chains with generic `FUNCTIONS` lookup
+  - Supports context-aware macros via `needs_context` flag
+  - Arity enforcement prevents malformed trees from silently failing
+- **Enhanced Primitives System**:
+  - `register_function()` now accepts `needs_context` parameter
+  - `unregister_function()` for pruning underperformers
+  - `FUNCTION_NAMES` maintains sorted order for determinism
+- **SelfImprovingEvolver Integration**:
+  - `enable_promotion_manager` flag to opt-in to economic learning
+  - `library_budget` parameter to control macro limit
+  - `economy_tick` monotonic counter for market timing
+  - Legacy auto-register disabled when Promotion Manager enabled (prevents "economy leaks")
+  - Promotion stats included in performance reports
+- **Comprehensive Test Suite**:
+  - `tests/test_compiler.py`: Unit tests for PrimitiveCompiler
+  - `tests/test_promotion.py`: Unit tests for PromotionManager
+  - `tests/test_primitives.py`: Tests for needs_context and unregister_function
+  - `tests/test_promotion_integration.py`: End-to-end integration tests
+  - Updated `tests/test_fitness.py`: Tests for generic dispatch and macro support
+  - Updated `tests/test_self_improving.py`: Tests for Promotion Manager integration
+
+### Changed
+- `fitness.py`: Refactored `_evaluate()` to use generic function dispatch
+  - All functions now go through `FUNCTIONS` registry lookup
+  - Added `_call_standard_function()` helper for type coercion
+  - Error returns changed from `0` to `None` (neutral failure)
+  - Arity validation before function dispatch
+- `primitives.py`: 
+  - `register_function()` signature: added `needs_context: bool = False`
+  - `FUNCTION_NAMES` is now sorted after each append (determinism)
+  - Added `unregister_function()` for removing primitives
+- `self_improving.py`:
+  - Added `enable_promotion_manager` and `library_budget` parameters
+  - Promotion Manager processes champions after each evolution run
+  - Economy tick advances monotonically
+  - Legacy auto-register path disabled when PM enabled
+
+### Architecture
+- **Separation of Concerns**: Promotion Manager operates at orchestration boundary, not within evolution engine
+- **Introspection Mechanism**: Macros carry `subtree_definition` for expansion during pattern discovery
+- **Economic Model**: Learning requires evidence of marginal value, competes under scarcity, remains removable
+- **Determinism**: All operations remain seed-deterministic and replayable
+
+### Backward Compatibility
+- All existing code continues to work without changes
+- Promotion Manager is opt-in (disabled by default)
+- Legacy auto-register still works when Promotion Manager is disabled
+- Generic dispatch maintains compatibility with all existing function types
+
 ## [1.2.0] - 2026-01-11
 
 ### Added

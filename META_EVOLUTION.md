@@ -57,7 +57,7 @@ from alert_axolotl_evo.evolution import evolve
 evolve(config=optimal_config)
 ```
 
-### Self-Improving
+### Self-Improving (Legacy Mode)
 
 ```python
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
@@ -82,6 +82,64 @@ print(f"Auto-registered primitives: {evolver.registered_primitives}")
 
 # Check data adaptations
 print(f"Data adaptations: {evolver.data_adaptations}")
+```
+
+### Self-Improving with Promotion Manager (Economic Learning)
+
+The Promotion Manager implements "Evolutionary Economics" - a more rigorous learning system that enforces economic constraints on self-extension.
+
+```python
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.config import Config
+
+# Enable Promotion Manager (economic learning)
+evolver = SelfImprovingEvolver(
+    enable_promotion_manager=True,  # Enable economic learning
+    library_budget=50,              # Maximum active macros
+    # Note: When PM is enabled, legacy auto_register is automatically disabled
+    # to prevent "economy leaks" (unbudgeted primitives)
+)
+
+config = Config()
+config.evolution.pop_size = 30
+config.evolution.generations = 10
+
+# Run multiple evolutions - system discovers and promotes patterns
+for i in range(5):
+    result = evolver.run_and_learn(config, f"run_{i}")
+    print(f"Run {i}: Fitness {result['fitness']:.2f}")
+    
+    # Check promotion activity
+    report = evolver.get_performance_report()
+    if "promotion_manager" in report:
+        pm = report["promotion_manager"]
+        print(f"  Active macros: {pm['active_macros_count']}/{pm['library_budget']}")
+        print(f"  Promoted: {pm['promoted_macros']}")
+
+# View economic activity
+report = evolver.get_performance_report()
+if "promotion_manager" in report:
+    pm_stats = report["promotion_manager"]
+    print(f"\nEconomic Summary:")
+    print(f"  Active Macros: {pm_stats['active_macros_count']}")
+    print(f"  Candidate Families: {pm_stats['candidate_families']}")
+    print(f"  Total Promoted: {len(evolver.promoted_macros)}")
+```
+
+#### Economy Tick
+
+The `economy_tick` is a monotonic counter that advances with each evolution run, independent of GP generation numbers. This provides a stable "market time" for tracking when patterns were last seen (for ghost pruning) and ensures economic operations happen at safe boundaries.
+
+```python
+# Economy tick starts at 0 and increments with each run
+evolver = SelfImprovingEvolver(enable_promotion_manager=True)
+assert evolver.economy_tick == 0
+
+evolver.run_and_learn(config, "run_0")
+assert evolver.economy_tick == 1
+
+evolver.run_and_learn(config, "run_1")
+assert evolver.economy_tick == 2  # Always increments
 ```
 
 ### Analytics

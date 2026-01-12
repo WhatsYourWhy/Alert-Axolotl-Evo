@@ -1,9 +1,17 @@
 """
-The 'Heartbeat' Test.
-Runs a 50-generation simulation to verify:
+The 'Heartbeat' Test - Integration Test for Promotion Manager Economy.
+
+This is an integration test script (not a unit test) that runs actual evolution
+to verify the Promotion Manager economic system works correctly.
+
+Verifies:
 1. Monotonic Tick is advancing.
 2. PromotionManager is discovering patterns.
 3. The Economy is strictly enforcing the budget (Promotions & Evictions).
+
+Run with: python test_economy.py
+
+Note: This creates test artifacts in test_economy_results/ directory.
 """
 import logging
 import sys

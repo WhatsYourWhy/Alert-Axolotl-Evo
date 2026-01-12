@@ -205,3 +205,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Alert-Axolotl-Evo result directories
+evolution_results/
+self_improving_results/
+test_economy_results/
+test_long_economy_results/
+demo_champion.json

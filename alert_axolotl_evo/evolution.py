@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.data import DataLoader, create_data_loader
-from alert_axolotl_evo.fitness import fitness
+from alert_axolotl_evo.fitness import fitness, fitness_breakdown, print_fitness_comparison
 from alert_axolotl_evo.operators import (
     initialize_population,
     point_mutation,
@@ -170,6 +170,28 @@ def evolve(
     except UnicodeEncodeError:
         # Fallback for Windows console encoding issues
         logging.getLogger("evo").info("Final Champion Tree: %s", champion)
+    
+    # Print fitness breakdown comparison with baselines
+    try:
+        champion_breakdown = fitness_breakdown(
+            champion,
+            seed,
+            generations - 1,
+            config.fitness,
+            config.data,
+            data_loader,
+        )
+        print_fitness_comparison(
+            champion,
+            champion_breakdown,
+            seed,
+            generations - 1,
+            config.fitness,
+            config.data,
+            data_loader,
+        )
+    except Exception as e:
+        logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")
     
     # Export rule if requested
     if export_rule_path:

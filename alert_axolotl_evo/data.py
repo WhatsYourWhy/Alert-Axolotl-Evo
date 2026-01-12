@@ -2,10 +2,13 @@
 
 import csv
 import json
+import logging
 import random
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class DataLoader(ABC):
@@ -54,38 +57,88 @@ class MockDataLoader(DataLoader):
 
 
 class CSVDataLoader(DataLoader):
-    """Load data from CSV file."""
+    """Load data from CSV file with optional auto-labeling."""
     
     def __init__(
         self,
         path: Path,
         value_column: str = "value",
         timestamp_column: str = "timestamp",
-        anomaly_column: str = None,
+        anomaly_column: Optional[str] = None,
+        auto_label_percentile: float = 0.98,
     ):
+        """
+        Args:
+            path: Path to CSV file
+            value_column: Column name for numeric values
+            timestamp_column: Column name for timestamps (optional, not used in load)
+            anomaly_column: Column name for anomaly labels (optional)
+            auto_label_percentile: Percentile threshold for auto-labeling when anomaly_column is missing
+                                  Values above this percentile are labeled as anomalies
+        """
         self.path = Path(path)
         self.value_column = value_column
         self.timestamp_column = timestamp_column
         self.anomaly_column = anomaly_column
+        self.auto_label_percentile = auto_label_percentile
     
     def load(self) -> Tuple[List[float], List[bool]]:
-        """Load data from CSV."""
-        values = []
-        anomalies = []
+        """
+        Load data from CSV.
         
+        If anomaly_column is missing, auto-labels anomalies using percentile threshold.
+        """
+        values = []
+        raw_values = []
+        anomalies = []
+        has_anomaly_column = False
+        
+        # First pass: load values and check for anomaly column
         with open(self.path, "r", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 try:
                     value = float(row[self.value_column])
+                    raw_values.append(value)
                     values.append(value)
                     
+                    # Check if anomaly column exists in this row
                     if self.anomaly_column and self.anomaly_column in row:
-                        anomalies.append(row[self.anomaly_column].lower() in ("true", "1", "yes", "anomaly"))
+                        has_anomaly_column = True
+                        anomalies.append(
+                            row[self.anomaly_column].lower() in ("true", "1", "yes", "anomaly")
+                        )
                     else:
-                        anomalies.append(False)
+                        anomalies.append(None)  # Placeholder - will be auto-labeled if needed
                 except (ValueError, KeyError):
                     continue
+        
+        # Auto-label if anomaly column was missing
+        if not has_anomaly_column and raw_values:
+            try:
+                import numpy as np
+                threshold = np.quantile(raw_values, self.auto_label_percentile)
+                anomalies = [v > threshold for v in raw_values]
+                
+                logger.warning(
+                    "CSVDataLoader: anomaly column '%s' missing — auto-labeling top %.2f%% (threshold=%.2f)",
+                    self.anomaly_column or "<not specified>",
+                    (1 - self.auto_label_percentile) * 100,
+                    threshold
+                )
+            except ImportError:
+                # Fallback if numpy not available: use simple percentile calculation
+                sorted_values = sorted(raw_values)
+                threshold_idx = int(len(sorted_values) * self.auto_label_percentile)
+                threshold = sorted_values[min(threshold_idx, len(sorted_values) - 1)]
+                anomalies = [v > threshold for v in raw_values]
+                
+                logger.warning(
+                    "CSVDataLoader: anomaly column '%s' missing — auto-labeling top %.2f%% (threshold=%.2f, numpy not available)",
+                    self.anomaly_column or "<not specified>",
+                    (1 - self.auto_label_percentile) * 100,
+                    threshold
+                )
         
         return values, anomalies
 

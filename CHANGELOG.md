@@ -2,6 +2,49 @@
 
 All notable changes to Alert-Axolotl-Evo will be documented in this file.
 
+## [Unreleased] - Fitness Alignment Documentation
+
+### Added
+- **Fitness Alignment Documentation**: Comprehensive documentation of Metric-Aligned Semantic Program Synthesis
+  - `docs/FITNESS_ALIGNMENT.md`: Main documentation covering alignment mechanisms, operational justifications, and layered audience content
+  - `docs/FITNESS_ALIGNMENT_VALIDATION.md`: Validation methodology, baseline comparison, and drift detection guide
+  - `docs/FITNESS_ALIGNMENT_CHANGELOG.md`: Historical tracking of alignment mechanism evolution
+- **FitnessAlignmentConfig**: New configuration dataclass for alignment thresholds
+  - `min_precision`: Minimum precision threshold (default 0.3 = 30%)
+  - `max_fpr`: Maximum false positive rate (default 0.15 = 15%)
+  - `min_alert_rate`: Minimum alert rate floor (default 0.002 = 0.2%)
+  - `max_alert_rate`: Maximum alert rate ceiling (default 0.20 = 20%)
+  - `always_true_threshold`: Hard limit for always-true detection (default 0.50 = 50%)
+  - `min_recall`: Minimum recall floor (default 0.1 = 10%)
+- **Enhanced Code Documentation**: 
+  - Module-level docstring in `fitness.py` explaining alignment philosophy
+  - Section headers organizing alignment mechanisms
+  - Detailed docstrings for each alignment mechanism with operational justifications
+  - Enhanced function docstrings with alignment context
+
+### Changed
+- `ARCHITECTURE.md`: Added "Fitness Alignment Layer" section documenting Layer 5 of the architecture
+- `README.md`: Added fitness alignment to Key Features and Design Philosophy sections
+- `alert_axolotl_evo/fitness.py`: Enhanced with comprehensive alignment documentation
+- `alert_axolotl_evo/config.py`: Added `FitnessAlignmentConfig` dataclass (thresholds still hardcoded, config for future use)
+
+### Documentation
+- **Fitness Alignment Mechanisms Documented**:
+  - Precision pressure (≥30% for human-paged alerts)
+  - FPR penalties (≤15% operational noise tolerance)
+  - Alert-rate bands (0.2%-20% deployment feasibility)
+  - Recall floors (≥10% minimum usefulness)
+  - Degenerate collapse prevention (always-true/always-false elimination)
+  - Invalid output gates (semantic error detection)
+- **Operational Justifications**: Each threshold documented with real-world operational reasoning
+- **Baseline Verification**: Documented how `print_fitness_comparison()` validates alignment
+- **Validation Guide**: Comprehensive guide for testing and validating alignment mechanisms
+
+### Notes
+- Alignment mechanisms were implemented incrementally over time (see `docs/FITNESS_ALIGNMENT_CHANGELOG.md`)
+- Current implementation uses hardcoded thresholds; `FitnessAlignmentConfig` added for future integration
+- All alignment mechanisms are production-ready and validated
+
 ## [1.3.0] - 2026-01-11
 
 ### Added

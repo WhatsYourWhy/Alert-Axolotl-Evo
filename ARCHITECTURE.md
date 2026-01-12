@@ -299,11 +299,17 @@ A proposed change is acceptable only if:
 
 If the answer is no, the change does not belong here.
 
-### 10. Summary
+### 10. Fitness Alignment
+
+The system implements **Metric-Aligned Semantic Program Synthesis**, where fitness scores are aligned with operational constraints, not just optimized for higher numbers. This ensures that "high fitness" means "operationally useful" - meeting precision requirements, staying within false positive limits, and functioning within deployment constraints.
+
+See [`docs/FITNESS_ALIGNMENT.md`](docs/FITNESS_ALIGNMENT.md) for comprehensive documentation of alignment mechanisms.
+
+### 11. Summary
 
 Alert-Axolotl-Evo is not trying to become everything.
 
-It is trying to become **correct, interpretable, and self-extending without losing control**.
+It is trying to become **correct, interpretable, self-extending without losing control, and operationally aligned**.
 
 **That constraint is the project.**
 
@@ -386,7 +392,9 @@ Alert-Axolotl-Evo is a genetic programming system that evolves alert rules for a
 
 #### `fitness.py`
 - Tree evaluation engine (`evaluate`, `_evaluate`)
-- Fitness calculation using F-beta score
+- Fitness calculation using F-beta score with operational alignment
+- **Fitness Alignment**: Precision pressure, FPR penalties, alert-rate bands, recall floors, degenerate collapse prevention
+- Baseline verification (`print_fitness_comparison()`)
 - Data loader integration
 - Number coercion utilities
 - Mock data generation (fallback)
@@ -579,6 +587,32 @@ This represents: "If average latency > 100, alert 'High alert!'"
   - False Negatives (FN): Anomaly missed
 - **Bloat Control**: Penalty based on tree size
 - **Bonuses**: Configurable bonuses for specific patterns
+
+### Fitness Alignment Layer
+
+Alert-Axolotl-Evo implements **Metric-Aligned Semantic Program Synthesis**, where the fitness function is aligned with real-world operational constraints rather than simply optimized for higher scores. This ensures that "high fitness" means "operationally useful," not just "numerically high."
+
+**Key Alignment Mechanisms** (see [`docs/FITNESS_ALIGNMENT.md`](docs/FITNESS_ALIGNMENT.md) for details):
+
+- **Precision Pressure** (≥30%): Enforces human-paged alert cost models
+- **FPR Penalties** (≤15%): Operational noise tolerance limits
+- **Alert-Rate Bands** (0.2%-20%): Deployment feasibility constraints
+- **Recall Floors** (≥10%): Minimum usefulness requirements
+- **Degenerate Collapse Prevention**: Eliminates always-true/always-false solutions
+- **Invalid Output Gates**: Catches semantic errors in evolved logic
+
+**Implementation**: All alignment mechanisms are in [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) (lines 472-525).
+
+**Baseline Verification**: The system includes built-in baseline comparison (`print_fitness_comparison()`) to ensure evolved solutions strictly dominate degenerate baselines (always-true, always-false, random threshold).
+
+**Architectural Position**: This is **Layer 5** of the five-layer architecture:
+1. Genetic Programming (mechanism)
+2. Program Synthesis (output form)
+3. Constraint-Guided Search (semantic validity)
+4. Economically Regulated Learning (macro library, budgets)
+5. **Metric-Aligned Fitness Shaping** ← *This layer*
+
+This layer is rare in genetic programming systems. Most stop at layers 1-2. Alert-Axolotl-Evo explicitly implements all five, with fitness alignment ensuring operational relevance.
 
 ### Elitism
 - **Ratio**: 10% (configurable)

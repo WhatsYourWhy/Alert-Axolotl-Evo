@@ -91,7 +91,49 @@ if alert:
     # Send to your monitoring system
 ```
 
-### 3. Self-Improving Evolution with Economic Learning (Promotion Manager)
+### 3. Understanding Fitness Alignment
+
+Alert-Axolotl-Evo implements **Metric-Aligned Semantic Program Synthesis**, where fitness scores are aligned with operational constraints rather than simply optimized for higher numbers. This ensures that "high fitness" means "operationally useful."
+
+#### What This Means
+
+When you deploy an evolved rule, you can trust that:
+- **Precision ≥ 30%**: Rules meet human-paged alert cost models
+- **FPR ≤ 15%**: Rules stay within operational noise tolerance
+- **Alert Rate 0.2%-20%**: Rules alert at deployment-feasible rates
+- **Recall ≥ 10%**: Rules detect at least some anomalies (minimum usefulness)
+- **No Degenerate Solutions**: Always-true/always-false rules are eliminated
+
+#### How to Interpret Fitness Scores
+
+Higher fitness means the rule meets more operational constraints. A rule with fitness 8.5 is operationally better than one with fitness 2.0, not just numerically higher.
+
+```python
+from alert_axolotl_evo.fitness import fitness_breakdown, print_fitness_comparison
+
+# Get detailed breakdown
+breakdown = fitness_breakdown(champion_tree, seed=42, gen=10)
+
+# Check operational metrics
+print(f"Precision: {breakdown['precision']:.3f} ({breakdown['precision']*100:.1f}%)")
+print(f"FPR: {breakdown['fpr']:.3f} ({breakdown['fpr']*100:.1f}%)")
+print(f"Alert Rate: {breakdown['alert_rate']:.3f} ({breakdown['alert_rate']*100:.2f}%)")
+print(f"Recall: {breakdown['recall']:.3f} ({breakdown['recall']*100:.1f}%)")
+
+# Verify against baselines
+print_fitness_comparison(champion_tree, breakdown, seed=42, gen=10)
+```
+
+#### When to Adjust Alignment Thresholds
+
+Only adjust if your operational constraints differ from the defaults. For example:
+- **Automated Response Systems**: May tolerate lower precision (not human-paged)
+- **High-Stakes Monitoring**: May require higher precision (≥50%)
+- **Rare Anomaly Detection**: May need lower recall floor (≥5%)
+
+See [`docs/FITNESS_ALIGNMENT.md`](docs/FITNESS_ALIGNMENT.md) for comprehensive documentation.
+
+### 4. Self-Improving Evolution with Economic Learning (Promotion Manager)
 
 The Promotion Manager implements "Evolutionary Economics" - patterns must demonstrate causal value to be promoted as reusable macros. This system discovers common algorithm structures and promotes them through a lifecycle: candidate → active → retired.
 

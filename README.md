@@ -18,6 +18,7 @@ The system is designed for anomaly detection in time-series data, but the archit
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation
 - **[docs/design_contract.md](docs/design_contract.md)**: Design Contract for AI Assistants - Evolutionary Economics architecture constraints
+- **[docs/FITNESS_ALIGNMENT.md](docs/FITNESS_ALIGNMENT.md)**: Fitness alignment and metric-aligned semantic program synthesis documentation
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
 - **[USAGE.md](USAGE.md)**: Practical usage guide and real-world examples
 - **[META_EVOLUTION.md](META_EVOLUTION.md)**: Meta-evolution and self-improving system guide
@@ -30,6 +31,12 @@ The system is designed for anomaly detection in time-series data, but the archit
 ### Core Capabilities
 
 - **Symbolic Rule Evolution**: Evolves explicit logic trees (not neural networks) for full interpretability
+- **Production-Grade Fitness Alignment**: Metric-aligned semantic program synthesis ensures fitness scores correspond to operational value
+  - Precision pressure (≥30% for human-paged alerts)
+  - FPR penalties (≤15% operational noise tolerance)
+  - Alert-rate bands (0.2%-20% deployment feasibility)
+  - Recall floors (≥10% minimum usefulness)
+  - Degenerate collapse prevention (always-true/always-false elimination)
 - **Evolutionary Economics**: PromotionManager enforces economic constraints on self-extension
   - Patterns must demonstrate causal lift to be promoted
   - Hard budget limits with eviction rules
@@ -42,10 +49,10 @@ The system is designed for anomaly detection in time-series data, but the archit
 ### Technical Highlights
 
 - **Tree-based representation**: Programs are nested tuples like `('if_alert', ('>', ('avg', 'latency'), 100), 'High ping!')`
-- **Fitness-based selection**: F-beta scoring with bloat penalties
+- **Fitness-based selection**: F-beta scoring with operational alignment constraints
 - **Extensible architecture**: Easy to add new primitives and operators
 - **Comprehensive configuration**: YAML/JSON config files with CLI overrides
-- **Production-ready**: Export evolved rules for deployment
+- **Production-ready**: Export evolved rules for deployment with operational guarantees
 
 ## Installation
 
@@ -383,13 +390,14 @@ For detailed API documentation, see the inline docstrings in the source code. Ke
 
 ## Design Philosophy
 
-Alert-Axolotl-Evo is built on three non-negotiable principles:
+Alert-Axolotl-Evo is built on four non-negotiable principles:
 
 1. **Interpretability**: All evolved rules are explicit, inspectable logic trees
 2. **Determinism**: Seeded runs are fully reproducible
 3. **Evolutionary Economics**: Learning must pay rent - patterns must demonstrate causal value
+4. **Fitness Alignment**: Fitness scores must correspond to operational value, not just numerical optimization
 
-See [docs/design_contract.md](docs/design_contract.md) for the complete design contract.
+See [docs/design_contract.md](docs/design_contract.md) for the complete design contract and [docs/FITNESS_ALIGNMENT.md](docs/FITNESS_ALIGNMENT.md) for fitness alignment documentation.
 
 ## License
 

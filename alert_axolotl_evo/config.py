@@ -36,6 +36,46 @@ class FitnessConfig:
 
 
 @dataclass
+class FitnessAlignmentConfig:
+    """
+    Operational constraints encoded in fitness alignment.
+    
+    This configuration defines the thresholds for Metric-Aligned Semantic Program
+    Synthesis. Each threshold maps to an operational constraint, not just a tuning
+    parameter. See docs/FITNESS_ALIGNMENT.md for comprehensive documentation.
+    
+    Attributes:
+        min_precision: Minimum precision threshold (default 0.3 = 30%)
+            Human-paged alert cost model. Below this, operational cost of false
+            alarms exceeds value of detection.
+        
+        max_fpr: Maximum false positive rate (default 0.15 = 15%)
+            Operational noise tolerance. Beyond this, alert fatigue sets in.
+        
+        min_alert_rate: Minimum alert rate floor (default 0.002 = 0.2%)
+            Deployment feasibility floor. Rules below this are effectively
+            never-firing.
+        
+        max_alert_rate: Maximum alert rate ceiling (default 0.20 = 20%)
+            Operational noise ceiling. Rules above this become too noisy.
+        
+        always_true_threshold: Hard limit for always-true detection (default 0.50 = 50%)
+            Rules above this are "always-true collapse" and must be strictly
+            dominated. Penalty scales with dataset size.
+        
+        min_recall: Minimum recall floor (default 0.1 = 10%)
+            Minimum usefulness requirement. Rules with zero true positives
+            are explicitly penalized.
+    """
+    min_precision: float = 0.3  # Human-paged alert cost model
+    max_fpr: float = 0.15  # Operational noise tolerance
+    min_alert_rate: float = 0.002  # Deployment feasibility floor
+    max_alert_rate: float = 0.20  # Operational noise ceiling
+    always_true_threshold: float = 0.50  # Always-true collapse detection
+    min_recall: float = 0.1  # Minimum usefulness requirement
+
+
+@dataclass
 class DataConfig:
     """Data generation/loading parameters."""
     data_source: str = "mock"  # "mock", "csv", "json"
@@ -64,6 +104,7 @@ class Config:
     evolution: EvolutionConfig = field(default_factory=EvolutionConfig)
     operators: OperatorsConfig = field(default_factory=OperatorsConfig)
     fitness: FitnessConfig = field(default_factory=FitnessConfig)
+    fitness_alignment: FitnessAlignmentConfig = field(default_factory=FitnessAlignmentConfig)
     data: DataConfig = field(default_factory=DataConfig)
 
     @classmethod
@@ -76,6 +117,8 @@ class Config:
             config.operators = OperatorsConfig(**data["operators"])
         if "fitness" in data:
             config.fitness = FitnessConfig(**data["fitness"])
+        if "fitness_alignment" in data:
+            config.fitness_alignment = FitnessAlignmentConfig(**data["fitness_alignment"])
         if "data" in data:
             data_dict = data["data"].copy()
             # Convert data_path string to Path if present
@@ -128,6 +171,14 @@ class Config:
                 "bloat_penalty": self.fitness.bloat_penalty,
                 "fp_threshold": self.fitness.fp_threshold,
                 "fp_penalty": self.fitness.fp_penalty,
+            },
+            "fitness_alignment": {
+                "min_precision": self.fitness_alignment.min_precision,
+                "max_fpr": self.fitness_alignment.max_fpr,
+                "min_alert_rate": self.fitness_alignment.min_alert_rate,
+                "max_alert_rate": self.fitness_alignment.max_alert_rate,
+                "always_true_threshold": self.fitness_alignment.always_true_threshold,
+                "min_recall": self.fitness_alignment.min_recall,
             },
             "data": {
                 "data_source": self.data.data_source,

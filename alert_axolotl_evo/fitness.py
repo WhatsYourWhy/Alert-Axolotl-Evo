@@ -1,4 +1,22 @@
-"""Fitness evaluation and tree evaluation."""
+"""
+Fitness evaluation and tree evaluation.
+
+This module implements Metric-Aligned Semantic Program Synthesis, where fitness
+scores are aligned with real-world operational constraints rather than simply
+optimized for higher numbers. This ensures that "high fitness" means "operationally
+useful" - meeting precision requirements, staying within false positive limits,
+and functioning within deployment constraints.
+
+Key Alignment Mechanisms:
+- Precision pressure (≥30% for human-paged alerts)
+- FPR penalties (≤15% operational noise tolerance)
+- Alert-rate bands (0.2%-20% deployment feasibility)
+- Recall floors (≥10% minimum usefulness)
+- Degenerate collapse prevention (always-true/always-false elimination)
+- Invalid output gates (semantic error detection)
+
+See docs/FITNESS_ALIGNMENT.md for comprehensive documentation.
+"""
 
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -200,8 +218,36 @@ def fitness_breakdown(
     """
     Compute fitness and return detailed breakdown for debugging.
     
+    This function provides a detailed breakdown of fitness components, including
+    all alignment metrics (precision, FPR, alert rate, recall, etc.). Useful for
+    understanding why a rule has a particular fitness score and verifying that
+    alignment mechanisms are working correctly.
+    
+    See docs/FITNESS_ALIGNMENT.md for documentation of alignment mechanisms.
+    
+    Args:
+        tree: The evolved rule tree to evaluate
+        seed: Random seed for data generation
+        gen: Generation number (affects data if consistent_data=False)
+        fitness_config: Fitness configuration parameters
+        data_config: Data configuration parameters
+        data_loader: Optional data loader (overrides data_config)
+    
     Returns:
-        Dictionary with keys: fitness, tp, fp, fn, tp_rate, fp_rate, fn_rate, f_beta, score, penalty
+        Dictionary with keys:
+        - fitness: Final fitness score (after all penalties)
+        - tp, fp, fn: True positives, false positives, false negatives
+        - possible_tp, normal_count: Total anomalies and normal samples
+        - tp_rate, fp_rate, fn_rate: Rates relative to possible_tp
+        - precision: TP/(TP+FP) - classic precision metric
+        - fpr: FP/normal_count - classic false positive rate
+        - recall: TP/possible_tp - alias for tp_rate
+        - f_beta: F-beta score (before penalties)
+        - score: Base score (f_beta * possible_tp, before penalties)
+        - penalty: Bloat penalty (node_count * bloat_penalty)
+        - alert_rate: (TP+FP)/total_rows - overall alert rate
+        - invalid_rate: Rate of invalid outputs
+        - node_count: Tree size (for parsimony)
     """
     if fitness_config is None:
         fitness_config = FitnessConfig()
@@ -360,9 +406,31 @@ def fitness(
     """
     Compute fitness based on detection quality and parsimony.
     
+    This function implements Metric-Aligned Semantic Program Synthesis, where
+    fitness scores are aligned with operational constraints:
+    - Precision pressure (≥30% for human-paged alerts)
+    - FPR penalties (≤15% operational noise tolerance)
+    - Alert-rate bands (0.2%-20% deployment feasibility)
+    - Recall floors (≥10% minimum usefulness)
+    - Degenerate collapse prevention (always-true/always-false elimination)
+    
     NOTE: fitness must be pure and side-effect free.
     This function computes a score based on tree evaluation and data.
     It does not modify global state, registries, or learning mechanisms.
+    
+    See docs/FITNESS_ALIGNMENT.md for comprehensive documentation of alignment
+    mechanisms and their operational justifications.
+    
+    Args:
+        tree: The evolved rule tree to evaluate
+        seed: Random seed for data generation
+        gen: Generation number (affects data if consistent_data=False)
+        fitness_config: Fitness configuration parameters
+        data_config: Data configuration parameters
+        data_loader: Optional data loader (overrides data_config)
+    
+    Returns:
+        Fitness score (higher is better, but must meet operational constraints)
     """
     if fitness_config is None:
         fitness_config = FitnessConfig()
@@ -469,6 +537,27 @@ def fitness(
     # Apply invalid output penalty
     score -= score_invalid_penalty
     
+    # ============================================================================
+    # FITNESS ALIGNMENT: Operational Constraints
+    # ============================================================================
+    # This section implements Metric-Aligned Semantic Program Synthesis.
+    # Each penalty maps to an operational constraint, not just a tuning parameter.
+    # See docs/FITNESS_ALIGNMENT.md for comprehensive documentation.
+    # ============================================================================
+    
+    # ----------------------------------------------------------------------------
+    # Degenerate Collapse Prevention
+    # ----------------------------------------------------------------------------
+    # Operational Constraint: Rules that always return True or always return False
+    # are useless, even if they technically have "good" metrics.
+    #
+    # Self-Comparison Detection: Self-comparisons (e.g., x > x) always evaluate
+    # to False/True and provide no useful logic.
+    #
+    # No-Alert Detection: Rules that never alert (tp=0, fp=0) are useless even
+    # if they avoid false positives.
+    # ----------------------------------------------------------------------------
+    
     # DEGENERATE COMPARISON PENALTY: Self-comparisons are always False/True and useless
     # Check the condition subtree for self-comparisons
     if isinstance(tree, tuple) and len(tree) >= 3 and tree[0] == "if_alert":
@@ -479,6 +568,21 @@ def fitness(
     # NO-ALERT PENALTY: Trees that never alert are useless
     if tp == 0 and fp == 0:
         score -= 5.0  # Explicit penalty that dominates bloat incentives
+    
+    # ----------------------------------------------------------------------------
+    # Alert-Rate Band Constraints
+    # ----------------------------------------------------------------------------
+    # Operational Constraint: Rules must alert at deployment-feasible rates.
+    # Too low (<0.2%): Never fires (useless)
+    # Too high (>20%): Too noisy (operational fatigue)
+    # Very high (>50%): "Always-true collapse" (must be strictly dominated)
+    #
+    # Thresholds:
+    # - 0.2% floor: Rules below this are effectively never-firing
+    # - 20% ceiling: Rules above this become too noisy for operational use
+    # - 50% hard limit: Above this, rules are "always-true" and must be strictly
+    #   dominated (penalty scales with dataset size to ensure dominance)
+    # ----------------------------------------------------------------------------
     
     # ALERT-RATE BAND PENALTY: Prefer rules that alert at reasonable rates
     # Too low: < 0.2% (effectively never fires)
@@ -496,6 +600,19 @@ def fitness(
     elif alert_rate > 0.20:  # More than 20% but <= 50%
         score -= 3.0  # Penalty for too-high alert rate
     
+    # ----------------------------------------------------------------------------
+    # Precision Pressure
+    # ----------------------------------------------------------------------------
+    # Operational Constraint: Human-paged alerts have real cost. If precision is
+    # too low, operators get overwhelmed by false alarms.
+    #
+    # Threshold: 30% precision minimum
+    # Justification: This represents a reasonable balance for human-paged alerts.
+    # Below this, the operational cost of false alarms exceeds the value of detection.
+    #
+    # Penalty: Scales with precision deficit (max 1.5 points for 0% precision)
+    # ----------------------------------------------------------------------------
+    
     # PRECISION PRESSURE: Penalize low precision (too many false alarms)
     # Target precision >= 0.3 (30%) for human-paged alerts
     normal_count = total_rows - possible_tp
@@ -509,9 +626,36 @@ def fitness(
             precision_deficit = 0.3 - precision
             score -= 5.0 * precision_deficit  # Max penalty of 1.5 for 0% precision
     
+    # ----------------------------------------------------------------------------
+    # FPR Penalties
+    # ----------------------------------------------------------------------------
+    # Operational Constraint: False positive rate must stay within operational
+    # noise tolerance. High FPR creates alert fatigue.
+    #
+    # Threshold: 15% FPR maximum
+    # Justification: This represents the maximum acceptable false positive rate
+    # for operational monitoring. Beyond this, alert fatigue sets in and operators
+    # start ignoring alerts.
+    #
+    # Penalty: Scales with excess FPR (2.0 * (fpr - 0.15))
+    # ----------------------------------------------------------------------------
+    
     # FPR PENALTY: Also penalize very high false positive rate directly
     if fpr > 0.15:  # More than 15% false positive rate
         score -= 2.0 * (fpr - 0.15)  # Penalty scales with excess FPR
+    
+    # ----------------------------------------------------------------------------
+    # Recall Floors
+    # ----------------------------------------------------------------------------
+    # Operational Constraint: Rules must detect at least some anomalies to be
+    # useful. Zero detection is worse than useless.
+    #
+    # Threshold: 10% recall minimum (or at least 1 TP)
+    # Justification: This ensures rules have minimum useful detection. Rules with
+    # zero true positives are explicitly penalized.
+    #
+    # Penalty: 3.0 points for zero detection (recall < 0.1 and tp == 0)
+    # ----------------------------------------------------------------------------
     
     # MINIMUM TP FLOOR: Soft constraint for minimum useful detection
     # If we have labeled anomalies, require at least 1 TP (or recall >= 0.1)
@@ -571,7 +715,30 @@ def print_fitness_comparison(
     data_config: Optional[DataConfig] = None,
     data_loader: Optional[DataLoader] = None,
 ) -> None:
-    """Print fitness breakdown comparing champion to baselines."""
+    """
+    Print fitness breakdown comparing champion to baselines.
+    
+    This function validates fitness alignment by comparing the evolved champion
+    against three degenerate baselines:
+    1. Always-False: Rule that never alerts
+    2. Always-True: Rule that always alerts
+    3. Random Baseline: Simple threshold rule
+    
+    If alignment is working correctly, the champion should strictly dominate all
+    baselines. If not, this indicates a loophole in the alignment mechanisms.
+    
+    This is a critical sanity check for fitness alignment. See
+    docs/FITNESS_ALIGNMENT.md for more on baseline verification.
+    
+    Args:
+        champion_tree: The evolved champion rule
+        champion_breakdown: Fitness breakdown from fitness_breakdown()
+        seed: Random seed for baseline evaluation
+        gen: Generation number
+        fitness_config: Fitness configuration
+        data_config: Data configuration
+        data_loader: Optional data loader
+    """
     print("\n" + "=" * 70)
     print("  FITNESS BREAKDOWN COMPARISON")
     print("=" * 70)

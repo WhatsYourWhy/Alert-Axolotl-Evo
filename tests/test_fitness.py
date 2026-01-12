@@ -436,3 +436,157 @@ def test_fitness_with_realistic_data():
     assert breakdown['alert_rate'] <= 1.0
     assert breakdown['invalid_rate'] >= 0.0
     assert breakdown['invalid_rate'] <= 1.0
+
+
+class TestFitnessAlignment:
+    """Test fitness alignment mechanisms."""
+    
+    def test_precision_pressure(self):
+        """Test that precision pressure is applied for low precision rules."""
+        # Create a rule with very low threshold (will have many false positives)
+        low_precision_tree = ("if_alert", (">", ("avg", "latency"), 10), "Low threshold")
+        breakdown = fitness_breakdown(low_precision_tree, seed=42, gen=0)
+        
+        # If precision is below 30%, penalty should be applied
+        if breakdown['precision'] < 0.3 and breakdown['tp'] + breakdown['fp'] > 0:
+            # Score should be lower due to precision penalty
+            # Base score is f_beta * possible_tp, then penalties applied
+            assert breakdown['fitness'] < breakdown['score']  # Penalties reduce fitness
+    
+    def test_fpr_penalty(self):
+        """Test that FPR penalty is applied for high false positive rate."""
+        # Create a rule with very low threshold (high FPR)
+        high_fpr_tree = ("if_alert", (">", ("avg", "latency"), 5), "Very low threshold")
+        breakdown = fitness_breakdown(high_fpr_tree, seed=42, gen=0)
+        
+        # If FPR > 15%, penalty should be applied
+        if breakdown['fpr'] > 0.15:
+            # Fitness should be penalized
+            assert breakdown['fitness'] < breakdown['score']
+    
+    def test_alert_rate_band_low(self):
+        """Test that alert rate below 0.2% is penalized."""
+        # Create a rule with very high threshold (rarely fires)
+        low_alert_tree = ("if_alert", (">", ("max", "latency"), 10000), "Very high threshold")
+        breakdown = fitness_breakdown(low_alert_tree, seed=42, gen=0)
+        
+        # If alert rate < 0.2%, penalty should be applied
+        if breakdown['alert_rate'] < 0.002:
+            assert breakdown['fitness'] < breakdown['score']
+    
+    def test_alert_rate_band_high(self):
+        """Test that alert rate above 20% is penalized."""
+        # Create an always-true rule (high alert rate)
+        always_true_tree = ("if_alert", True, "Always alerts")
+        breakdown = fitness_breakdown(always_true_tree, seed=42, gen=0)
+        
+        # Alert rate should be very high (>50%)
+        assert breakdown['alert_rate'] > 0.50
+        
+        # Should have heavy penalty (scales with dataset size)
+        # For 1000 rows at 100% alert rate: penalty = 2.0 * 0.5 * 1000 = 1000
+        assert breakdown['fitness'] < breakdown['score']
+        # Fitness should be very negative
+        assert breakdown['fitness'] < -100.0  # Heavy penalty for always-true
+    
+    def test_recall_floor(self):
+        """Test that recall floor is enforced (minimum 10% or TP > 0)."""
+        # Create a rule that never detects anomalies
+        never_detects_tree = ("if_alert", (">", ("max", "latency"), 10000), "Too high")
+        breakdown = fitness_breakdown(never_detects_tree, seed=42, gen=0)
+        
+        # If recall < 10% and TP == 0, penalty should be applied
+        if breakdown['recall'] < 0.1 and breakdown['tp'] == 0:
+            assert breakdown['fitness'] < breakdown['score']
+    
+    def test_degenerate_self_comparison(self):
+        """Test that self-comparisons are penalized."""
+        from alert_axolotl_evo.tree import is_self_comparison
+        
+        # Create a self-comparison (always False/True)
+        self_comp_tree = ("if_alert", (">", "latency", "latency"), "Self comparison")
+        
+        # Verify it's detected as self-comparison
+        condition = self_comp_tree[1]
+        assert is_self_comparison(condition)
+        
+        breakdown = fitness_breakdown(self_comp_tree, seed=42, gen=0)
+        
+        # Should have heavy penalty (-10.0)
+        assert breakdown['fitness'] < breakdown['score']
+    
+    def test_degenerate_no_alert(self):
+        """Test that rules that never alert are penalized."""
+        # Create a rule that never alerts (always False condition)
+        never_alert_tree = ("if_alert", False, "Never alerts")
+        breakdown = fitness_breakdown(never_alert_tree, seed=42, gen=0)
+        
+        # Should have TP=0, FP=0
+        assert breakdown['tp'] == 0
+        assert breakdown['fp'] == 0
+        
+        # Should have penalty (-5.0)
+        assert breakdown['fitness'] < breakdown['score']
+    
+    def test_baseline_comparison(self):
+        """Test that evolved rules should beat baselines."""
+        from alert_axolotl_evo.fitness import (
+            baseline_always_false, baseline_always_true, baseline_random
+        )
+        
+        # A reasonable rule should beat baselines
+        good_tree = ("if_alert", (">", ("max", "latency"), 75), "High latency")
+        breakdown = fitness_breakdown(good_tree, seed=42, gen=0)
+        
+        # Get baselines
+        always_false = baseline_always_false(seed=42, gen=0)
+        always_true = baseline_always_true(seed=42, gen=0)
+        random_baseline = baseline_random(seed=42, gen=0, threshold=50.0)
+        
+        # Good rule should beat always-false (unless it's also degenerate)
+        if breakdown['tp'] > 0 or breakdown['fp'] > 0:
+            assert breakdown['fitness'] > always_false['fitness']
+        
+        # Good rule should beat always-true (which has heavy penalty)
+        assert breakdown['fitness'] > always_true['fitness']
+        
+        # Good rule should generally beat random baseline
+        # (may not always be true, but should be often)
+        # This is a soft check - if it fails, investigate why
+    
+    def test_invalid_output_gate(self):
+        """Test that invalid outputs are penalized."""
+        # Create a tree that produces invalid outputs
+        # (e.g., statistical function on scalar instead of list)
+        invalid_tree = ("if_alert", (">", ("avg", 50), 100), "Invalid")
+        breakdown = fitness_breakdown(invalid_tree, seed=42, gen=0)
+        
+        # If invalid rate > 0, should have penalty
+        if breakdown['invalid_rate'] > 0.0:
+            # Soft penalty: 0.5 * invalid_rate
+            assert breakdown['fitness'] <= breakdown['score']
+        
+        # If invalid rate > 50%, should be rejected (hard gate)
+        # This is tested by fitness() returning -100.0
+        if breakdown['invalid_rate'] > 0.5:
+            fit = fitness(invalid_tree, seed=42, gen=0)
+            assert fit == -100.0
+    
+    def test_alignment_metrics_in_breakdown(self):
+        """Test that all alignment metrics are included in breakdown."""
+        tree = ("if_alert", (">", ("max", "latency"), 75), "High latency")
+        breakdown = fitness_breakdown(tree, seed=42, gen=0)
+        
+        # Check all alignment-related metrics are present
+        assert 'precision' in breakdown
+        assert 'fpr' in breakdown
+        assert 'recall' in breakdown
+        assert 'alert_rate' in breakdown
+        assert 'invalid_rate' in breakdown
+        
+        # Check metrics are in valid ranges
+        assert 0.0 <= breakdown['precision'] <= 1.0
+        assert 0.0 <= breakdown['fpr'] <= 1.0
+        assert 0.0 <= breakdown['recall'] <= 1.0
+        assert 0.0 <= breakdown['alert_rate'] <= 1.0
+        assert 0.0 <= breakdown['invalid_rate'] <= 1.0

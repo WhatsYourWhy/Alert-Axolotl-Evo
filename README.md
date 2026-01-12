@@ -1,6 +1,18 @@
 # Alert-Axolotl-Evo
 
-Alert Axolotl Evo is a deterministic, gamified genetic programming system that evolves alert rules expressed as nested tuples. It generates a population of alert-rule trees, evaluates them against data (mock or real), and narrates an over-the-top evolution loop with ASCII trees, dramatic logs, and playful names.
+A deterministic, interpretable genetic programming system for evolving symbolic alert rules. Alert-Axolotl-Evo uses evolutionary economics to discover and optimize anomaly detection rules expressed as explicit logic trees, ensuring full interpretability and deterministic behavior.
+
+## Overview
+
+Alert-Axolotl-Evo implements a **symbolic evolutionary economics** approach to program synthesis. Unlike neural networks or statistical learners, this system:
+
+- Evolves **explicit logic trees** (nested tuples) that are fully inspectable
+- Uses **economic constraints** to manage self-extension (PromotionManager)
+- Maintains **deterministic behavior** through seeded evolution
+- Enforces **causal contribution** requirements for learned primitives
+- Provides **white-box interpretability** for all evolved rules
+
+The system is designed for anomaly detection in time-series data, but the architecture supports any domain where symbolic rule evolution is valuable.
 
 ## Documentation
 
@@ -13,17 +25,27 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 - **[examples/fun_examples.md](examples/fun_examples.md)**: Fun gamification examples
 - **[examples/output_sample.txt](examples/output_sample.txt)**: Sample evolution output
 
-## Features
+## Key Features
 
-- **Symbolic Evolutionary Economics**: This system uses symbolic evolutionary economics, not neural networks.
-- **Tree-based alert rules**: Programs are nested tuples like `('if_alert', ('>', ('avg', 'latency'), 100), 'High ping!')`
-- **Deterministic evolution**: Seeded data and selection ensure reproducible runs
-- **Gamified storytelling**: Births, battles, funerals, and champions are announced with flair
-- **Bloat-aware scoring**: Fitness rewards true positives, penalizes false positives, and lightly penalizes oversized trees
-- **Extensible primitives**: Rich set of functions and operators, easily extensible
-- **Configuration system**: YAML/JSON config files and CLI arguments
-- **Persistence**: Save/load evolved rules and checkpoint evolution
-- **Real data support**: Load data from CSV, JSON, or use mock data
+### Core Capabilities
+
+- **Symbolic Rule Evolution**: Evolves explicit logic trees (not neural networks) for full interpretability
+- **Evolutionary Economics**: PromotionManager enforces economic constraints on self-extension
+  - Patterns must demonstrate causal lift to be promoted
+  - Hard budget limits with eviction rules
+  - Evidence-based promotion and pruning
+- **Deterministic Behavior**: Seeded evolution ensures reproducible results
+- **Real-World Data Support**: Load from CSV/JSON with optional auto-labeling
+- **Self-Improving Mode**: System learns optimal configurations and discovers useful patterns
+- **Checkpoint & Persistence**: Save/load evolution state and evolved rules
+
+### Technical Highlights
+
+- **Tree-based representation**: Programs are nested tuples like `('if_alert', ('>', ('avg', 'latency'), 100), 'High ping!')`
+- **Fitness-based selection**: F-beta scoring with bloat penalties
+- **Extensible architecture**: Easy to add new primitives and operators
+- **Comprehensive configuration**: YAML/JSON config files with CLI overrides
+- **Production-ready**: Export evolved rules for deployment
 
 ## Installation
 
@@ -41,10 +63,6 @@ pip install -e .
 pip install -e ".[yaml]"
 ```
 
-### Requirements
-
-- Python 3.8+
-- Optional: PyYAML (for YAML config files)
 
 ## Quick Start
 
@@ -95,8 +113,12 @@ python -m alert_axolotl_evo.main --export-rule champion.json
 # Meta-evolution: Evolve better evolution parameters
 python -m alert_axolotl_evo.main --meta-evolve --meta-generations 5
 
-# Self-improving mode: Learn from each run
-python -m alert_axolotl_evo.main --self-improving --results-dir results/
+# Self-improving mode with economic learning
+python -m alert_axolotl_evo.main \
+    --self-improving \
+    --enable-promotion-manager \
+    --library-budget 20 \
+    --results-dir results/
 
 # Generate performance report
 python -m alert_axolotl_evo.main --performance-report
@@ -233,73 +255,44 @@ optimal_config = best_genome.to_config(base_config)
 evolve(config=optimal_config)
 ```
 
-### Self-Improving Evolution
+### Self-Improving Evolution with Economic Learning
 
 ```python
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.config import Config
+from pathlib import Path
 
-# System learns from each run and auto-improves
+# Enable PromotionManager for economic learning
 evolver = SelfImprovingEvolver(
-    auto_register=True,  # Auto-register new primitives from patterns
-    adapt_data=True,     # Adapt training data automatically
+    results_dir=Path("evolution_results"),
+    enable_promotion_manager=True,  # Enable economic learning
+    library_budget=20,              # Maximum active macros
+    min_promo_batch=4,             # Minimum batch size
+    promo_warmup_ticks=3,          # Warmup period
 )
+
 config = Config()
 
-for i in range(5):
-    config = evolver.get_optimal_config(config)  # Gets learned optimal config
-    evolver.run_and_learn(config, f"run_{i}")
+for i in range(10):
+    config = evolver.get_optimal_config(config)
+    result = evolver.run_and_learn(config, f"run_{i}")
+    
+    # View economic activity
+    evolver.print_market_status()
 
-# Check what was auto-improved
-print(f"Auto-registered primitives: {evolver.registered_primitives}")
-print(f"Data adaptations: {len(evolver.data_adaptations)}")
-
-# Get improvement suggestions
-suggestions = evolver.suggest_improvements()
-
-# Get performance report with auto-improvement history
+# Get performance report
 report = evolver.get_performance_report()
 ```
 
-**New Features:**
-- **Auto-Registration**: Automatically registers new primitives (e.g., `avg_gt`, `max_gt`) based on discovered patterns
-- **Data Adaptation**: Automatically adapts mock data parameters to create more challenging training data
-- **Enhanced Reports**: Performance reports now include auto-registered primitives and data adaptation history
+**Economic Learning Features:**
+- **PromotionManager**: Enforces economic constraints on pattern promotion
+  - Patterns must show causal lift (not just correlation)
+  - Hard budget limits with eviction rules
+  - Evidence-based promotion and pruning
+- **Monotonic Economic Time**: `economy_tick` ensures correct pattern aging
+- **Market Status Reports**: Inspect active library, promotions, and candidates
 
-**Getting Started with Self-Improving Features:**
-
-1. **Run Multiple Evolutions**: Auto-registration requires at least 2 runs to detect patterns:
-   ```python
-   evolver = SelfImprovingEvolver(
-       auto_register=True,
-       adapt_data=True,
-       min_pattern_usage=3  # Lower for testing, default is 5
-   )
-   
-   for i in range(5):  # Run at least 2-3 times
-       config = evolver.get_optimal_config(Config())
-       evolver.run_and_learn(config, f"run_{i}")
-   ```
-
-2. **Check Results**: After multiple runs, check what was learned:
-   ```python
-   print(f"Registered primitives: {evolver.registered_primitives}")
-   print(f"Data adaptations: {len(evolver.data_adaptations)}")
-   report = evolver.get_performance_report()
-   ```
-
-3. **Enable Diagnostics**: If auto-registration doesn't trigger, enable logging:
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
-   # Then run auto_register_primitives() to see diagnostic output
-   ```
-
-**Realistic Expectations:**
-- Auto-registration typically triggers after 3-5 runs with common patterns
-- Default threshold (`min_pattern_usage=5`) requires patterns in 5+ champion rules
-- Data adaptation only works with mock data (CSV/JSON data is never modified)
-- Both features require at least 2 runs in history to activate
+See `docs/design_contract.md` for the complete economic architecture.
 
 ### Extending Primitives
 
@@ -313,7 +306,17 @@ register_function("multiply", lambda a, b: a * b, arity=2)
 register_terminal(300)
 ```
 
-## Project Structure
+## Architecture
+
+The system is organized into three main layers:
+
+1. **Evolution Engine** (`evolution.py`, `fitness.py`, `operators.py`): Core GP mechanics
+2. **Promotion/Market Layer** (`promotion.py`, `compiler.py`): Economic learning system
+3. **Orchestration Layer** (`self_improving.py`): Coordinates evolution and promotion
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for complete architectural documentation.
+
+### Project Structure
 
 ```
 alert_axolotl_evo/
@@ -324,14 +327,16 @@ alert_axolotl_evo/
 ├── evolution.py           # Evolution loop
 ├── fitness.py             # Fitness evaluation
 ├── operators.py           # Genetic operators
-├── visualization.py        # ASCII trees, narratives
-├── data.py                # Data loading
+├── visualization.py       # ASCII trees, narratives
+├── data.py                # Data loading (CSV/JSON/Mock)
 ├── persistence.py         # Save/load rules
 ├── analytics.py           # Performance analytics
 ├── pattern_discovery.py   # Pattern analysis
 ├── meta_evolution.py      # Meta-evolution core
 ├── self_improving.py      # Self-improving wrapper
-└── main.py                # Entry point
+├── promotion.py           # PromotionManager (economic learning)
+├── compiler.py            # Macro compilation
+└── main.py                # CLI entry point
 
 tests/
 ├── test_tree.py
@@ -339,6 +344,9 @@ tests/
 ├── test_operators.py
 ├── test_evolution.py
 ├── test_data.py
+├── test_data_provenance.py
+├── test_csv_auto_labeling.py
+├── test_economy_invariants.py
 ├── test_analytics.py
 ├── test_meta_evolution.py
 └── test_self_improving.py
@@ -346,76 +354,53 @@ tests/
 
 ## Testing
 
-Run tests with pytest:
+Run the test suite:
 
 ```bash
 pytest tests/
 ```
 
-## API Documentation
+The test suite includes:
+- Core functionality tests
+- Economic invariant tests
+- Data loading and provenance tests
+- Integration tests
 
-### Core Functions
+## API Reference
 
-#### `evolve(config, checkpoint_path, save_checkpoint_path, export_rule_path)`
-Main evolution loop. Runs genetic programming to evolve alert rules.
+For detailed API documentation, see the inline docstrings in the source code. Key modules:
 
-#### `evaluate(tree, data)`
-Evaluate a tree against data dictionary.
+- **Core Evolution**: `evolution.evolve()`, `fitness.fitness()`, `fitness.evaluate()`
+- **Data Loading**: `data.DataLoader`, `data.CSVDataLoader`, `data.JSONDataLoader`
+- **Self-Improving**: `self_improving.SelfImprovingEvolver`
+- **Economic Learning**: `promotion.PromotionManager`
+- **Configuration**: `config.Config`
 
-#### `fitness(tree, seed, gen, fitness_config, data_config)`
-Calculate fitness score for a tree.
+## Requirements
 
-### Data Loaders
+- Python 3.8 or higher
+- Optional: PyYAML (for YAML config file support)
 
-#### `MockDataLoader(seed, size, anomaly_count, anomaly_multiplier)`
-Generate mock latency data with anomalies.
+## Design Philosophy
 
-#### `CSVDataLoader(path, value_column, timestamp_column, anomaly_column)`
-Load data from CSV file.
+Alert-Axolotl-Evo is built on three non-negotiable principles:
 
-#### `JSONDataLoader(path, value_key, timestamp_key, anomaly_key)`
-Load data from JSON file.
+1. **Interpretability**: All evolved rules are explicit, inspectable logic trees
+2. **Determinism**: Seeded runs are fully reproducible
+3. **Evolutionary Economics**: Learning must pay rent - patterns must demonstrate causal value
 
-#### `create_data_loader(config)`
-Factory function to create appropriate DataLoader from DataConfig.
-
-### Meta-Evolution
-
-#### `MetaEvolver(base_config, pop_size, generations)`
-Evolves better evolution parameters.
-
-#### `ConfigGenome(pop_size, mutation_rate, crossover_rate, tournament_size, elite_ratio)`
-Represents a configuration as a genome for meta-evolution.
-
-#### `SelfImprovingEvolver(results_dir)`
-Wrapper that learns from evolution runs and improves automatically.
-
-### Analytics
-
-#### `analyze_evolution_results(results_dir)`
-Analyze evolution results from checkpoint and rule files.
-
-#### `track_performance_metrics(results)`
-Track performance metrics from evolution results.
-
-#### `discover_common_patterns(rules_dir)`
-Discover common patterns in evolved rules.
-
-#### `suggest_new_primitives(patterns)`
-Suggest new primitives based on discovered patterns.
-
-## Archived Files
-
-The original single-file implementation (`alert_axolotl_evo.py`) has been moved to the `archive/` directory. See `archive/README.md` for details. The new modular package is the recommended approach, but `alert_axolotl_evo_legacy.py` provides backward compatibility.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+See [docs/design_contract.md](docs/design_contract.md) for the complete design contract.
 
 ## License
 
-MIT License
+**Proprietary - All Rights Reserved**
+
+Copyright (c) 2024 Alert Axolotl Evo
+
+This software is proprietary and confidential. Unauthorized use, reproduction, or distribution is prohibited. For licensing inquiries, please contact the copyright holder.
+
+See [LICENSE](LICENSE) for full terms.
 
 ## Acknowledgments
 
-Inspired by genetic programming techniques and the joy of evolving code that actually works (sometimes).
+Built with principles from genetic programming, program synthesis, and evolutionary economics. The system demonstrates that interpretable AI can be both powerful and disciplined.

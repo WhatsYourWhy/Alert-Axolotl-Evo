@@ -91,7 +91,44 @@ if alert:
     # Send to your monitoring system
 ```
 
-### 3. Continuous Evolution with Checkpoints
+### 3. Self-Improving Evolution with Economic Learning
+
+```bash
+# Enable PromotionManager (economic learning system)
+python -m alert_axolotl_evo.main --self-improving --enable-promotion-manager
+
+# Customize economic parameters
+python -m alert_axolotl_evo.main \
+    --self-improving \
+    --enable-promotion-manager \
+    --library-budget 20 \
+    --min-promo-batch 4 \
+    --promo-warmup-ticks 3
+```
+
+The PromotionManager implements "Evolutionary Economics" - patterns must demonstrate causal value to be promoted as macros. See `docs/design_contract.md` for details.
+
+```python
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+from alert_axolotl_evo.config import Config
+from pathlib import Path
+
+# Enable economic learning
+evolver = SelfImprovingEvolver(
+    results_dir=Path("evolution_results"),
+    enable_promotion_manager=True,
+    library_budget=20,
+    min_promo_batch=4,
+    promo_warmup_ticks=3,
+)
+
+config = Config()
+for i in range(10):
+    result = evolver.run_and_learn(config, f"run_{i}")
+    evolver.print_market_status()  # View economic activity
+```
+
+### 4. Continuous Evolution with Checkpoints
 
 ```python
 from alert_axolotl_evo.evolution import evolve

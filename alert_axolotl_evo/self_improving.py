@@ -220,6 +220,9 @@ class SelfImprovingEvolver:
             self.economy_tick += 1
         except Exception as e:
             logger.warning(f"Promotion manager processing failed: {e}")
+            # CRITICAL: Increment tick even on error to preserve monotonic economic time
+            # This ensures ghost pruning works correctly even if market updates fail
+            self.economy_tick += 1
     
     def _update_learned_config(self):
         """Update learned optimal configuration from history."""

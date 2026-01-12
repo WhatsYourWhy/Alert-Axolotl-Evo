@@ -21,6 +21,10 @@ def main():
     parser.add_argument("--meta-pop-size", type=int, default=10, help="Meta-evolution population size")
     parser.add_argument("--self-improving", action="store_true", help="Use self-improving evolver")
     parser.add_argument("--results-dir", type=Path, default=Path("evolution_results"), help="Results directory for self-improving mode")
+    parser.add_argument("--enable-promotion-manager", action="store_true", help="Enable PromotionManager (economic learning system)")
+    parser.add_argument("--library-budget", type=int, default=50, help="Maximum number of active macros (PromotionManager)")
+    parser.add_argument("--min-promo-batch", type=int, default=5, help="Minimum batch size to update market (PromotionManager)")
+    parser.add_argument("--promo-warmup-ticks", type=int, default=2, help="Warmup ticks before promotions allowed (PromotionManager)")
     parser.add_argument("--performance-report", action="store_true", help="Generate performance report from results")
     
     args = parser.parse_args()
@@ -63,12 +67,23 @@ def main():
     
     # Self-improving mode
     if args.self_improving:
-        evolver = SelfImprovingEvolver(results_dir=args.results_dir)
+        evolver = SelfImprovingEvolver(
+            results_dir=args.results_dir,
+            enable_promotion_manager=args.enable_promotion_manager,
+            library_budget=args.library_budget,
+            min_promo_batch=args.min_promo_batch,
+            promo_warmup_ticks=args.promo_warmup_ticks,
+        )
         # Use learned config if available
         config = evolver.get_optimal_config(config)
         run_id = f"run_{len(evolver.history)}"
         result = evolver.run_and_learn(config, run_id)
         print(f"\nRun complete. Fitness: {result['fitness']:.2f}")
+        
+        # Show market status if PromotionManager is enabled
+        if args.enable_promotion_manager:
+            evolver.print_market_status()
+        
         suggestions = evolver.suggest_improvements()
         if suggestions:
             print("\nImprovement suggestions:")

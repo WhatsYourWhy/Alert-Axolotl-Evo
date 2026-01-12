@@ -482,6 +482,15 @@ Evolution Parameters
 5. Persistence (optional)
    ├─> Checkpoint saving (every generation if configured)
    └─> Rule export (final champion)
+
+6. Self-Improving Mode (optional, when --self-improving is used)
+   ├─> Run evolution with SelfImprovingEvolver wrapper
+   ├─> If PromotionManager enabled:
+   │   ├─> Extract champions from checkpoint
+   │   ├─> Update pattern statistics (process_generation_results)
+   │   ├─> Promote/prune macros (promote_and_prune) after warmup
+   │   └─> Increment economy_tick (monotonic economic time)
+   └─> Learn optimal config from history
 ```
 
 ### Tree Evaluation Flow

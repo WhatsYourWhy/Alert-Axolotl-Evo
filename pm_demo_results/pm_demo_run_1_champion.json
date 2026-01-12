@@ -1,0 +1,26 @@
+{
+  "tree": [
+    "or",
+    [
+      "window_avg",
+      150,
+      [
+        ">",
+        "latency",
+        [
+          "window_min",
+          200,
+          50
+        ]
+      ]
+    ],
+    50
+  ],
+  "fitness": 2.13,
+  "generation": 4,
+  "metadata": {
+    "hash": "459fc8",
+    "node_count": 9,
+    "created_at": "2026-01-12T13:04:50.123177"
+  }
+}

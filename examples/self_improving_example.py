@@ -107,7 +107,7 @@ if __name__ == "__main__":
         for adaptation in report["data_adaptations"]:
             print(f"  Run {adaptation.get('run_id', '?')}:")
             for param, change_info in adaptation.get("changes", {}).items():
-                print(f"    {param}: {change_info.get('old')} → {change_info.get('new')}")
+                print(f"    {param}: {change_info.get('old')} -> {change_info.get('new')}")
                 print(f"      Reason: {change_info.get('reason', 'N/A')}")
     else:
         print(f"\nData Adaptations: None")
@@ -116,11 +116,11 @@ if __name__ == "__main__":
     print("Summary")
     print("=" * 70)
     print("\nThe system has:")
-    print("  ✓ Learned optimal evolution parameters")
+    print("  [OK] Learned optimal evolution parameters")
     if evolver.registered_primitives:
-        print(f"  ✓ Auto-registered {len(evolver.registered_primitives)} new primitives")
+        print(f"  [OK] Auto-registered {len(evolver.registered_primitives)} new primitives")
     if evolver.data_adaptations:
-        print(f"  ✓ Adapted data generation {len(evolver.data_adaptations)} times")
-    print("  ✓ Improved its own configuration automatically")
+        print(f"  [OK] Adapted data generation {len(evolver.data_adaptations)} times")
+    print("  [OK] Improved its own configuration automatically")
     print("\nEach run makes the next run better!")
 

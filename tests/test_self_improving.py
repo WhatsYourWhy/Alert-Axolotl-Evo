@@ -113,9 +113,9 @@ def test_auto_register_thresholds():
             min_pattern_usage=2
         )
         
-        # Create rules with common threshold values
-        thresholds = [125, 175, 225]  # Values not in default TERMINALS
-        for i, threshold in enumerate(thresholds):
+        # Create multiple rules with the same threshold value to meet min_pattern_usage
+        threshold = 125  # Value not in default TERMINALS
+        for i in range(3):  # Create 3 rules with same threshold
             rule_file = evolver.results_dir / f"run_{i}_champion.json"
             save_rule(
                 ("if_alert", (">", ("avg", "latency"), threshold), "alert"),
@@ -127,14 +127,12 @@ def test_auto_register_thresholds():
         # Auto-register primitives
         registered = evolver.auto_register_primitives()
         
-        # Verify thresholds were registered
+        # Verify threshold was registered (should appear 3 times, >= min_pattern_usage of 2)
         threshold_registered = [r for r in registered if r.startswith("threshold_")]
-        assert len(threshold_registered) > 0
+        assert len(threshold_registered) > 0, f"Expected threshold registration, got: {registered}"
         
-        # Verify thresholds are in TERMINALS
-        for threshold in thresholds:
-            if f"threshold_{threshold}" in registered:
-                assert threshold in TERMINALS
+        # Verify threshold is in TERMINALS
+        assert threshold in TERMINALS, f"Threshold {threshold} should be in TERMINALS"
 
 
 def test_adapt_data_generation():

@@ -46,6 +46,7 @@ class SelfImprovingEvolver:
         min_pattern_usage: int = 5,
         enable_promotion_manager: bool = False,
         library_budget: int = 50,
+        min_promo_batch: int = 5,
     ):
         self.results_dir = results_dir
         self.results_dir.mkdir(exist_ok=True, parents=True)
@@ -57,6 +58,7 @@ class SelfImprovingEvolver:
         self.adapt_data = adapt_data
         self.min_pattern_usage = min_pattern_usage
         self.enable_promotion_manager = enable_promotion_manager
+        self.min_promo_batch = min_promo_batch
         
         # Monotonic economic clock for PromotionManager (independent of GP generation)
         self.economy_tick = 0
@@ -149,13 +151,17 @@ class SelfImprovingEvolver:
                 for tree, fitness in champion_history
             ]
             
-            # Batch-size guard: prevent promotion on micro-batches where lift is meaningless
-            if len(champions) < 5:
-                return
-            
             # Use monotonic economic tick (not checkpoint generation which resets per run)
             # This ensures ghost pruning works correctly across multiple runs
             current_gen = self.economy_tick
+            
+            # Batch-size guard: prevent promotion on micro-batches where lift is meaningless
+            # Policy-level check: batch must be large enough for meaningful causal lift
+            # Note: promotion.py has its own < 2 defensive guard
+            if len(champions) < self.min_promo_batch:
+                # Still increment tick (economic time progresses even without promotion)
+                self.economy_tick += 1
+                return
             
             # Process generation results
             self.promotion_manager.process_generation_results(champions, current_gen)
@@ -171,7 +177,7 @@ class SelfImprovingEvolver:
                 self.promoted_macros.extend(promoted)
                 logger.info(f"🎊 Promotion Manager: Promoted {len(promoted)} macros: {promoted}")
             
-            # Increment economic clock after successful processing
+            # Increment economic clock after processing (whether promotion happened or not)
             self.economy_tick += 1
         except Exception as e:
             logger.warning(f"Promotion manager processing failed: {e}")

@@ -1,0 +1,17 @@
+{
+  "tree": [
+    "avg",
+    [
+      ">=",
+      50,
+      50
+    ]
+  ],
+  "fitness": 2.385,
+  "generation": 9,
+  "metadata": {
+    "hash": "f17701",
+    "node_count": 4,
+    "created_at": "2026-01-12T10:59:13.353640"
+  }
+}

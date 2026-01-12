@@ -278,3 +278,141 @@ This creates a truly self-improving system that:
 - Discovers and registers new primitives
 - Adapts training data for better results
 - Gets better with each run!
+
+## Troubleshooting
+
+### Auto-Registration Not Triggering
+
+**Problem:** Auto-registration doesn't seem to be registering new primitives.
+
+**Common Causes:**
+
+1. **Threshold Too High:** The default `min_pattern_usage=5` requires a pattern to appear in at least 5 champion rules. If you only have a few runs, lower the threshold:
+   ```python
+   evolver = SelfImprovingEvolver(min_pattern_usage=2)  # Lower threshold
+   ```
+
+2. **Insufficient History:** Auto-registration requires at least 2 runs in history:
+   ```python
+   # Auto-registration only runs when len(evolver.history) >= 2
+   # Run at least 2 evolution runs before expecting registration
+   ```
+
+3. **Patterns Not Common Enough:** The pattern must appear in multiple rules. Common patterns like "avg+>" need to be found in multiple champion files.
+
+4. **Checkpoint Files:** Only champion files (with "champion" in filename) are analyzed. Checkpoint files are ignored.
+
+**Diagnosis:**
+
+Enable diagnostic logging to see what's happening:
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+evolver = SelfImprovingEvolver(min_pattern_usage=1)
+registered = evolver.auto_register_primitives()
+```
+
+The diagnostic output will show:
+- How many files were analyzed
+- Pattern counts found
+- Which patterns meet the threshold
+- Why registration did/didn't happen
+
+**Solution:**
+
+1. Lower the threshold for testing:
+   ```python
+   evolver = SelfImprovingEvolver(min_pattern_usage=1)
+   ```
+
+2. Run more evolution runs to accumulate more patterns
+
+3. Check that champion files exist in the results directory:
+   ```python
+   champion_files = list(evolver.results_dir.glob("*champion*.json"))
+   print(f"Found {len(champion_files)} champion files")
+   ```
+
+### Data Adaptation Not Working
+
+**Problem:** Data parameters don't seem to be adapting.
+
+**Common Causes:**
+
+1. **Feature Disabled:** Check that `adapt_data=True`:
+   ```python
+   evolver = SelfImprovingEvolver(adapt_data=True)
+   ```
+
+2. **Insufficient History:** Requires at least 2 runs:
+   ```python
+   # Data adaptation needs len(evolver.history) >= 2
+   ```
+
+3. **Using Real Data:** Data adaptation only works with mock data. CSV/JSON data sources are never modified:
+   ```python
+   # Only adapts if config.data.data_source == "mock"
+   ```
+
+4. **Bounds Limiting Changes:** Adaptations are bounded (e.g., `anomaly_multiplier` between 1.5-4.0). If starting at an extreme value, changes may be clamped.
+
+**Solution:**
+
+1. Ensure you're using mock data:
+   ```python
+   config = Config()
+   config.data.data_source = "mock"  # Required for adaptation
+   ```
+
+2. Run multiple runs to build history
+
+3. Check adaptation history:
+   ```python
+   print(evolver.data_adaptations)  # See what changed
+   ```
+
+### Performance Issues
+
+**Problem:** Pattern discovery is slow or system uses too much memory.
+
+**Solutions:**
+
+1. **Many Files:** Pattern discovery processes all champion files. If you have 100+ files, consider:
+   - Cleaning up old results periodically
+   - Using a separate results directory for each experiment
+
+2. **Large History:** The history list grows with each run. For very long experiments:
+   - The history is stored in memory (no automatic limit)
+   - Consider periodically saving and clearing history if needed
+
+3. **Pattern Discovery:** Should complete in < 1 second for 20 files. If slower:
+   - Check for corrupted JSON files
+   - Verify file system performance
+
+### Common Error Messages
+
+**"Error processing X.json: 'tree'"**
+- The file is missing the 'tree' field (likely a checkpoint file)
+- Solution: Only champion files are processed. This is expected for checkpoint files.
+
+**"No thresholds found or thresholds is not a Counter"**
+- Pattern discovery didn't find any numeric thresholds
+- Solution: Normal if rules don't use numeric constants
+
+**"Not registering 'X' (already in FUNCTIONS)"**
+- The primitive is already registered (either built-in or previously auto-registered)
+- Solution: This is expected behavior - primitives are only registered once
+
+### Getting Help
+
+If issues persist:
+
+1. Enable diagnostic logging (see above)
+2. Check the performance report:
+   ```python
+   report = evolver.get_performance_report()
+   print(report)
+   ```
+3. Verify your setup matches the examples
+4. Check that all required files exist and are readable

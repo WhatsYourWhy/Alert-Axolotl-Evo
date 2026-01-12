@@ -26,7 +26,10 @@ def discover_common_patterns(rules_dir: Path) -> Dict[str, Any]:
         "common_structures": Counter(),
     }
     
-    for rule_file in rules_dir.glob("*.json"):
+    # Only process champion files, not checkpoint files
+    rule_files = [f for f in rules_dir.glob("*.json") if "champion" in f.name and "checkpoint" not in f.name]
+    
+    for rule_file in rule_files:
         try:
             rule_data = load_rule(rule_file)
             tree = rule_data["tree"]
@@ -67,6 +70,7 @@ def discover_common_patterns(rules_dir: Path) -> Dict[str, Any]:
                 patterns["common_structures"]["complex"] += 1
                 
         except Exception:
+            # Skip files that can't be processed (e.g., malformed JSON, missing fields)
             continue
     
     return patterns

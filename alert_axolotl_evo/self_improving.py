@@ -158,7 +158,15 @@ class SelfImprovingEvolver:
             return []
         
         registered = []
-        patterns = discover_common_patterns(self.results_dir)
+        try:
+            patterns = discover_common_patterns(self.results_dir)
+        except Exception as e:
+            # Graceful degradation: if pattern discovery fails, return empty list
+            import logging
+            logger = logging.getLogger("self_improving")
+            logger.warning(f"Pattern discovery failed: {e}")
+            return []
+        
         combinations = patterns.get("common_combinations", {})
         
         # Register common function combinations
@@ -212,7 +220,12 @@ class SelfImprovingEvolver:
         import copy
         adapted_config = copy.deepcopy(config)
         
-        patterns = discover_common_patterns(self.results_dir)
+        try:
+            patterns = discover_common_patterns(self.results_dir)
+        except Exception:
+            # Graceful degradation: if pattern discovery fails, return original config
+            return config
+        
         thresholds = patterns.get("common_thresholds", {})
         
         # Calculate fitness trend
@@ -237,7 +250,7 @@ class SelfImprovingEvolver:
                     # Reduce anomaly_multiplier by 10-15% to bring anomalies closer
                     reduction = 0.12  # 12% reduction
                     new_multiplier = adapted_config.data.anomaly_multiplier * (1 - reduction)
-                    adapted_config.data.anomaly_multiplier = max(1.5, new_multiplier)  # Min 1.5x
+                    adapted_config.data.anomaly_multiplier = max(1.5, min(4.0, new_multiplier))  # Min 1.5x, Max 4.0x
                     changes["anomaly_multiplier"] = {
                         "old": config.data.anomaly_multiplier,
                         "new": adapted_config.data.anomaly_multiplier,
@@ -249,7 +262,7 @@ class SelfImprovingEvolver:
             # Increase mock_size by 10-20%
             increase = 0.15  # 15% increase
             new_size = int(adapted_config.data.mock_size * (1 + increase))
-            adapted_config.data.mock_size = min(200, new_size)  # Max 200
+            adapted_config.data.mock_size = max(10, min(200, new_size))  # Min 10, Max 200
             changes["mock_size"] = {
                 "old": config.data.mock_size,
                 "new": adapted_config.data.mock_size,
@@ -261,7 +274,7 @@ class SelfImprovingEvolver:
             avg_fitness = sum(r["fitness"] for r in self.history) / len(self.history)
             if avg_fitness < 3.0:
                 new_count = adapted_config.data.anomaly_count + 1
-                adapted_config.data.anomaly_count = min(15, new_count)  # Max 15
+                adapted_config.data.anomaly_count = max(1, min(15, new_count))  # Min 1, Max 15
                 changes["anomaly_count"] = {
                     "old": config.data.anomaly_count,
                     "new": adapted_config.data.anomaly_count,
@@ -273,7 +286,7 @@ class SelfImprovingEvolver:
             # Increase anomaly_multiplier by 5-10%
             increase = 0.075  # 7.5% increase
             new_multiplier = adapted_config.data.anomaly_multiplier * (1 + increase)
-            adapted_config.data.anomaly_multiplier = min(4.0, new_multiplier)  # Max 4.0x
+            adapted_config.data.anomaly_multiplier = max(1.5, min(4.0, new_multiplier))  # Min 1.5x, Max 4.0x
             if "anomaly_multiplier" not in changes:
                 changes["anomaly_multiplier"] = {
                     "old": config.data.anomaly_multiplier,
@@ -282,6 +295,11 @@ class SelfImprovingEvolver:
                 }
             else:
                 changes["anomaly_multiplier"]["reason"] += "; Fitness plateauing"
+        
+        # Final bounds check to ensure all values are within acceptable ranges
+        adapted_config.data.anomaly_multiplier = max(1.5, min(4.0, adapted_config.data.anomaly_multiplier))
+        adapted_config.data.mock_size = max(10, min(200, adapted_config.data.mock_size))
+        adapted_config.data.anomaly_count = max(1, min(15, adapted_config.data.anomaly_count))
         
         # Track the adaptation
         if changes:

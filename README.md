@@ -264,6 +264,41 @@ report = evolver.get_performance_report()
 - **Data Adaptation**: Automatically adapts mock data parameters to create more challenging training data
 - **Enhanced Reports**: Performance reports now include auto-registered primitives and data adaptation history
 
+**Getting Started with Self-Improving Features:**
+
+1. **Run Multiple Evolutions**: Auto-registration requires at least 2 runs to detect patterns:
+   ```python
+   evolver = SelfImprovingEvolver(
+       auto_register=True,
+       adapt_data=True,
+       min_pattern_usage=3  # Lower for testing, default is 5
+   )
+   
+   for i in range(5):  # Run at least 2-3 times
+       config = evolver.get_optimal_config(Config())
+       evolver.run_and_learn(config, f"run_{i}")
+   ```
+
+2. **Check Results**: After multiple runs, check what was learned:
+   ```python
+   print(f"Registered primitives: {evolver.registered_primitives}")
+   print(f"Data adaptations: {len(evolver.data_adaptations)}")
+   report = evolver.get_performance_report()
+   ```
+
+3. **Enable Diagnostics**: If auto-registration doesn't trigger, enable logging:
+   ```python
+   import logging
+   logging.basicConfig(level=logging.DEBUG)
+   # Then run auto_register_primitives() to see diagnostic output
+   ```
+
+**Realistic Expectations:**
+- Auto-registration typically triggers after 3-5 runs with common patterns
+- Default threshold (`min_pattern_usage=5`) requires patterns in 5+ champion rules
+- Data adaptation only works with mock data (CSV/JSON data is never modified)
+- Both features require at least 2 runs in history to activate
+
 ### Extending Primitives
 
 ```python

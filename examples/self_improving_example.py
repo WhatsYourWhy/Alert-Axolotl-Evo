@@ -1,10 +1,14 @@
 """Example of self-improving evolution system with auto-registration and data adaptation."""
 
+import logging
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from pathlib import Path
 
 if __name__ == "__main__":
+    # Optional: Enable diagnostic logging to see what's happening
+    # Uncomment the next line to see detailed diagnostic output
+    # logging.basicConfig(level=logging.DEBUG, format="%(message)s")
     print("=" * 70)
     print("Self-Improving Evolution Example")
     print("=" * 70)
@@ -20,7 +24,9 @@ if __name__ == "__main__":
         results_dir=results_dir,
         auto_register=True,      # Enable automatic primitive registration
         adapt_data=True,         # Enable adaptive data generation
-        min_pattern_usage=3     # Lower threshold for demo (default is 5)
+        min_pattern_usage=2      # Lower threshold for demo (default is 5)
+        # Note: Lower threshold makes auto-registration more likely to trigger
+        # For production, use default min_pattern_usage=5 for more reliable patterns
     )
     
     # Run multiple evolutions, learning from each

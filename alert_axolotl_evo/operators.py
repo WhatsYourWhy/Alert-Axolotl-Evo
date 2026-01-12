@@ -15,11 +15,23 @@ def random_terminal(rng: Optional[random.Random] = None) -> Any:
 
 
 def random_numeric_terminal(rng: Optional[random.Random] = None) -> Any:
-    """Select a random numeric terminal (for condition generation)."""
+    """
+    Select a random numeric terminal (for condition generation).
+    
+    Only returns numeric values (int/float) or variable names (like "latency").
+    Explicitly excludes message terminals to prevent contamination of condition space.
+    """
     if rng is None:
         rng = random
-    numeric_terminals = [t for t in TERMINALS if isinstance(t, (int, float)) or (isinstance(t, str) and t not in MSG_TERMINALS)]
-    return rng.choice(numeric_terminals) if numeric_terminals else rng.choice(TERMINALS)
+    # Only numeric values and variable names (like "latency")
+    # Explicitly exclude all message strings
+    numeric_terminals = [
+        t for t in TERMINALS 
+        if isinstance(t, (int, float)) or 
+        (isinstance(t, str) and t not in MSG_TERMINALS and t == "latency")  # Only allow "latency" variable
+    ]
+    # Fallback to "latency" if no numeric terminals found (shouldn't happen)
+    return rng.choice(numeric_terminals) if numeric_terminals else "latency"
 
 
 def random_boolean_function(rng: Optional[random.Random] = None) -> str:

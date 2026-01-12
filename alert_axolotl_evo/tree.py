@@ -138,15 +138,74 @@ def merkle_hash(
     return get_stable_hash(combined_content)
 
 
+def is_boolean_expression(tree: Any, arities: dict) -> bool:
+    """
+    Check if a subtree is a boolean-returning expression.
+    
+    A boolean expression is:
+    - A comparison operator (>, <, >=, <=, ==, !=)
+    - A logical operator (and, or, not)
+    - NOT a terminal (string, number, or variable name)
+    - NOT a statistical function (avg, max, min, etc.)
+    """
+    if not isinstance(tree, tuple):
+        return False  # Terminals are not boolean expressions
+    if not tree:
+        return False
+    op = tree[0]
+    # Boolean-returning functions
+    boolean_ops = [">", "<", ">=", "<=", "==", "!=", "and", "or", "not"]
+    if op in boolean_ops:
+        # Check that children are valid subtrees
+        if op not in arities:
+            return False
+        if len(tree) - 1 != arities[op]:
+            return False
+        
+        # For logical operators (and, or, not), children must also be boolean expressions
+        # This prevents strings/numbers from being used directly in boolean ops
+        if op in ("and", "or", "not"):
+            if op == "not":
+                return is_boolean_expression(tree[1], arities)
+            else:
+                return (is_boolean_expression(tree[1], arities) and 
+                        is_boolean_expression(tree[2], arities))
+        
+        # For comparison operators, children can be numeric expressions (statistical functions, numbers, variables)
+        # But not message terminals or boolean expressions (comparisons produce booleans, not consume them)
+        for child in tree[1:]:
+            if isinstance(child, str) and child in MSG_TERMINALS:
+                return False  # Message terminal in comparison - invalid
+            # Allow numeric terminals, variables, and statistical functions
+            if isinstance(child, (int, float)):
+                continue  # Numeric literal - OK
+            if isinstance(child, str) and child == "latency":
+                continue  # Variable name - OK
+            if isinstance(child, tuple):
+                # Statistical function - OK (e.g., ('avg', 'latency'))
+                if child[0] in ("avg", "max", "min", "sum", "count", "stddev", "percentile", 
+                                "window_avg", "window_max", "window_min"):
+                    if is_valid_subtree(child, arities):
+                        continue
+            # Anything else (including other terminals) is invalid
+            return False
+        return True
+    # Statistical functions can be used in comparisons, but aren't boolean themselves
+    # They need to be wrapped in a comparison
+    return False
+
+
 def is_valid_alert_rule(tree: Any) -> bool:
     """
-    Check if a tree is a valid alert rule.
+    Check if a tree is a semantically valid alert rule.
     
     A valid alert rule must:
     - Be a tuple (not a terminal)
     - Have "if_alert" at root
     - Have correct arity (2 arguments: condition and message)
-    - Have valid children according to arities
+    - Condition must be a boolean-returning expression (not a message terminal)
+    - Message must be a message terminal (string from MSG_TERMINALS)
+    - All children must be valid subtrees according to arities
     
     Args:
         tree: Tree structure to validate
@@ -162,7 +221,20 @@ def is_valid_alert_rule(tree: Any) -> bool:
         return False
     if len(tree) != 3:  # if_alert requires 2 arguments
         return False
-    # Recursively validate children
+    
+    condition_subtree = tree[1]
+    message_terminal = tree[2]
+    
+    # Condition must be a boolean-returning expression
+    # This prevents message terminals from being used as conditions
+    if not is_boolean_expression(condition_subtree, ARITIES):
+        return False  # Condition is not a valid boolean expression
+    
+    # Message must be a string terminal (preferably from MSG_TERMINALS)
+    if not isinstance(message_terminal, str):
+        return False
+    
+    # Recursively validate children structure
     return is_valid_subtree(tree, ARITIES)
 
 

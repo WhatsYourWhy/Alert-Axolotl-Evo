@@ -41,7 +41,11 @@ def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
     """Call standard functions with appropriate type coercion."""
     # Handle unary functions
     if op == "not":
-        return func(bool(args[0]))
+        # STRICT: arg must be bool, not truthy
+        a_val = args[0]
+        if type(a_val) is not bool:
+            return None  # Invalid: not() requires bool input
+        return func(a_val)
     
     # Handle statistical functions (expect list - semantic validity enforcement)
     if op in ("avg", "max", "min", "sum", "count", "stddev"):
@@ -89,7 +93,12 @@ def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
     
     # Handle binary logical operators
     if op in ("and", "or"):
-        return func(bool(args[0]), bool(args[1]))
+        # STRICT: both args must be bool, not truthy
+        a_val = args[0]
+        b_val = args[1]
+        if type(a_val) is not bool or type(b_val) is not bool:
+            return None  # Invalid: and/or require bool inputs
+        return func(a_val, b_val)
     
     # Fallback: try direct call
     return func(*args)
@@ -119,9 +128,19 @@ def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
     if op == "if_alert":
         if len(tree) != 3:
             return None
-        cond = _evaluate(tree[1], data)
+        cond_val = _evaluate(tree[1], data)
         msg = _evaluate(tree[2], data)
-        return ALERT(bool(cond), msg)
+        
+        # STRICT: condition must be bool, not truthy
+        # This prevents strings/numbers from being "always true"
+        if type(cond_val) is not bool:
+            return None  # Invalid condition - treat as no alert
+        
+        # Message must be a string
+        if not isinstance(msg, str):
+            return None  # Invalid message
+        
+        return ALERT(cond_val, msg)
 
     # 4. Generic Function Dispatch (supports macros)
     func = FUNCTIONS.get(op)
@@ -262,7 +281,12 @@ def fitness_breakdown(
     # ALERT-RATE BAND PENALTY
     if alert_rate < 0.002:  # Less than 0.2%
         score -= 2.0
-    elif alert_rate > 0.20:  # More than 20%
+    elif alert_rate > 0.50:  # More than 50% - "always-true collapse"
+        # Heavy penalty that scales with alert rate and dataset size
+        excess_rate = alert_rate - 0.5
+        penalty = 2.0 * excess_rate * total_rows
+        score -= penalty
+    elif alert_rate > 0.20:  # More than 20% but <= 50%
         score -= 3.0
     
     # MINIMUM TP FLOOR
@@ -412,9 +436,17 @@ def fitness(
     # ALERT-RATE BAND PENALTY: Prefer rules that alert at reasonable rates
     # Too low: < 0.2% (effectively never fires)
     # Too high: > 20% (too noisy)
+    # Very high: > 50% ("always-true collapse" - must be strictly dominated)
     if alert_rate < 0.002:  # Less than 0.2%
         score -= 2.0  # Penalty for too-low alert rate
-    elif alert_rate > 0.20:  # More than 20%
+    elif alert_rate > 0.50:  # More than 50% - "always-true collapse"
+        # Heavy penalty that scales with alert rate and dataset size
+        # This ensures always-true rules are strictly dominated
+        excess_rate = alert_rate - 0.5
+        penalty = 2.0 * excess_rate * total_rows  # Scales with dataset size
+        # For 100% alert rate on 1000 rows: penalty = 2.0 * 0.5 * 1000 = 1000 points
+        score -= penalty
+    elif alert_rate > 0.20:  # More than 20% but <= 50%
         score -= 3.0  # Penalty for too-high alert rate
     
     # MINIMUM TP FLOOR: Soft constraint for minimum useful detection

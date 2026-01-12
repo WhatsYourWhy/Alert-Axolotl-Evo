@@ -76,7 +76,12 @@ class PromotionManager:
         Args:
             champions: List of {tree, fitness} dicts from this generation
             current_gen: Current generation number (for tracking last_seen)
+                Note: current_gen is the monotonic economic time index (a "market tick"),
+                not necessarily the GP generation number.
         """
+        # Micro-batch guard: prevent noise from tiny batches
+        if len(champions) < 2:
+            return
         gen_total_fit = sum(c['fitness'] for c in champions)
         gen_total_count = len(champions)
         

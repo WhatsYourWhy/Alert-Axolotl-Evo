@@ -112,8 +112,9 @@ def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
         if expected_arity is not None:
             actual_arity = len(tree) - 1
             if expected_arity != actual_arity:
-                # Wrong arity - return None (neutral failure)
-                return None
+                # Wrong arity - return 0 (safe penalized value)
+                # None can propagate weirdly or crash comparisons in GP fitness evaluation
+                return 0
         
         # Evaluate children first (Standard GP)
         # Note: For 0-arity macros, args will be empty.

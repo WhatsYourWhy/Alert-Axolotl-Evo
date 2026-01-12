@@ -5,6 +5,7 @@ Alert Axolotl Evo is a deterministic, gamified genetic programming system that e
 ## Documentation
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation
+- **[docs/design_contract.md](docs/design_contract.md)**: Design Contract for AI Assistants - Evolutionary Economics architecture constraints
 - **[CHANGELOG.md](CHANGELOG.md)**: Version history and migration guide
 - **[USAGE.md](USAGE.md)**: Practical usage guide and real-world examples
 - **[META_EVOLUTION.md](META_EVOLUTION.md)**: Meta-evolution and self-improving system guide

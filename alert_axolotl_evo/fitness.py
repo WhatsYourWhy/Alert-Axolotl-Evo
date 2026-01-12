@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from alert_axolotl_evo.config import DataConfig, FitnessConfig
 from alert_axolotl_evo.data import DataLoader, MockDataLoader
 from alert_axolotl_evo.primitives import ALERT, FUNCTIONS, ARITIES
+from alert_axolotl_evo.tree import is_valid_alert_rule, node_count
 
 
 def generate_mock_data(seed: int, size: int = 100, anomaly_count: int = 8, anomaly_multiplier: float = 2.5) -> Tuple[List[float], List[bool]]:
@@ -23,14 +24,17 @@ def generate_mock_data(seed: int, size: int = 100, anomaly_count: int = 8, anoma
     return values, anomalies
 
 
-def coerce_number(value: Any) -> float:
-    """Coerce a value to a number."""
+def coerce_number(value: Any) -> Optional[float]:
+    """
+    Coerce a value to a number.
+    
+    Only coerce numeric types (int, float). Returns None for non-numeric types.
+    List averaging is removed - if averaging is needed, use avg/window_avg explicitly.
+    """
     if isinstance(value, (int, float)):
         return float(value)
-    if isinstance(value, list):
-        numeric = [coerce_number(item) for item in value if item is not None]
-        return FUNCTIONS["avg"](numeric)
-    return 0.0
+    # Return None for non-numeric types (not 0.0)
+    return None
 
 
 def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
@@ -52,23 +56,36 @@ def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
     if op == "percentile":
         vals = args[0]
         p = coerce_number(args[1])
+        if p is None:
+            return None
         if isinstance(vals, list):
             numeric = [coerce_number(item) for item in vals if item is not None]
-            return func(numeric, p) if numeric else 0
-        return 0
+            numeric = [n for n in numeric if n is not None]
+            return func(numeric, p) if numeric else None
+        # Return None for invalid input (not 0)
+        return None
     
     # Handle window functions
     if op in ("window_avg", "window_max", "window_min"):
         vals = args[0]
-        n = int(coerce_number(args[1]))
+        n_val = coerce_number(args[1])
+        if n_val is None:
+            return None
+        n = int(n_val)
         if isinstance(vals, list):
             numeric = [coerce_number(item) for item in vals if item is not None]
-            return func(numeric, n) if numeric else 0
-        return 0
+            numeric = [n for n in numeric if n is not None]
+            return func(numeric, n) if numeric else None
+        # Return None for invalid input (not 0)
+        return None
     
     # Handle binary comparison operators
     if op in (">", "<", ">=", "<=", "==", "!="):
-        return func(coerce_number(args[0]), coerce_number(args[1]))
+        a = coerce_number(args[0])
+        b = coerce_number(args[1])
+        if a is None or b is None:
+            return None
+        return func(a, b)
     
     # Handle binary logical operators
     if op in ("and", "or"):
@@ -210,9 +227,13 @@ def fitness_breakdown(
     denom = (1 + beta_sq) * tp_rate + beta_sq * fn_rate + fp_rate
     f_beta = ((1 + beta_sq) * tp_rate / denom) if denom else 0.0
     score = f_beta * possible_tp
+    # NO-ALERT PENALTY: Trees that never alert are useless
+    if tp == 0 and fp == 0:
+        score -= 5.0  # Explicit penalty that dominates bloat incentives
+    
     if fp > fitness_config.fp_threshold:
         score -= fitness_config.fp_penalty
-    penalty = fitness_config.bloat_penalty * len(str(tree))
+    penalty = fitness_config.bloat_penalty * node_count(tree)
     final_fitness = score - penalty
     
     return {
@@ -271,13 +292,27 @@ def fitness(
             anomaly_count=data_config.anomaly_count,
             anomaly_multiplier=data_config.anomaly_multiplier,
         )
+    
+    # HARD VALIDITY GATE: Check tree structure
+    if not is_valid_alert_rule(tree):
+        return -100.0
+    
     tp = fp = fn = 0
+    invalid_output_count = 0
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
         window = values[start : idx + 1]
         data = {"latency": window}
         result = evaluate(tree, data)
+        
+        # HARD VALIDITY GATE: Check output validity
+        # Valid output is str (alert message) or None (no alert)
+        if result is not None and not isinstance(result, str):
+            invalid_output_count += 1
+            # If we get invalid output, treat as no alert for this iteration
+            result = None
+        
         alerting = isinstance(result, str)
         if anomalies[idx] and alerting:
             tp += 1
@@ -285,6 +320,10 @@ def fitness(
             fn += 1
         if not anomalies[idx] and alerting:
             fp += 1
+    
+    # HARD VALIDITY GATE: If too many invalid outputs, reject tree
+    if invalid_output_count > len(values) * 0.5:  # More than 50% invalid outputs
+        return -100.0
     # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
@@ -297,9 +336,14 @@ def fitness(
     score = f_beta * possible_tp
     # REMOVED: Hardcoded bonuses that reward trees containing "avg" and ">"
     # These were causing semantically invalid trees to win
+    
+    # NO-ALERT PENALTY: Trees that never alert are useless
+    if tp == 0 and fp == 0:
+        score -= 5.0  # Explicit penalty that dominates bloat incentives
+    
     if fp > fitness_config.fp_threshold:
         score -= fitness_config.fp_penalty
-    penalty = fitness_config.bloat_penalty * len(str(tree))
+    penalty = fitness_config.bloat_penalty * node_count(tree)
     return score - penalty
 
 

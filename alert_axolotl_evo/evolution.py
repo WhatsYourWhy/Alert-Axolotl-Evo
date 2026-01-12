@@ -15,7 +15,7 @@ from alert_axolotl_evo.operators import (
     tournament_select,
 )
 from alert_axolotl_evo.persistence import load_checkpoint, save_checkpoint, save_rule
-from alert_axolotl_evo.tree import node_count
+from alert_axolotl_evo.tree import ensure_alert_root, is_valid_alert_rule, node_count
 from alert_axolotl_evo.visualization import announce_birth, log_funeral, print_ascii_tree, generate_name
 
 
@@ -154,6 +154,13 @@ def evolve(
                 child_a = point_mutation(child_a, config.evolution.max_depth)
             if random.random() < config.operators.mutation_rate:
                 child_b = point_mutation(child_b, config.evolution.max_depth)
+            
+            # Post-operation validation: ensure children are valid alert rules
+            if not is_valid_alert_rule(child_a):
+                child_a = ensure_alert_root(child_a)
+            if not is_valid_alert_rule(child_b):
+                child_b = ensure_alert_root(child_b)
+            
             next_population.extend([child_a, child_b])
 
         population = next_population[:pop_size]

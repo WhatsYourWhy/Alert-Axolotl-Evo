@@ -33,7 +33,21 @@ FUNCTIONS: Dict[str, Callable] = {
 
 ALERT = lambda cond, msg: msg if cond else None
 
-# Terminal values
+# Message terminals (for alert messages only)
+MSG_TERMINALS: List[str] = [
+    "High alert!",
+    "Danger zone!",
+    "Anomaly detected!",
+    "Threshold exceeded!",
+]
+
+# Boolean-returning functions (for condition generation)
+BOOLEAN_FUNCTIONS: List[str] = [
+    ">", "<", ">=", "<=", "==", "!=",
+    "and", "or", "not",
+]
+
+# Terminal values (backward compatibility - includes numeric, variable, and message terminals)
 TERMINALS: List[Any] = [
     "latency",
     25, 50, 75, 100, 150, 200,

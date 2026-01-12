@@ -1,7 +1,10 @@
 """Tree manipulation utilities."""
 
 import hashlib
+import random
 from typing import Any, List, Optional, Set, Tuple, Union
+
+from alert_axolotl_evo.primitives import ARITIES, MSG_TERMINALS
 
 
 def tree_hash(tree: Any) -> str:
@@ -133,4 +136,61 @@ def merkle_hash(
     combined_content = f"FUNC:{func_name}:" + "".join(child_hashes)
     
     return get_stable_hash(combined_content)
+
+
+def is_valid_alert_rule(tree: Any) -> bool:
+    """
+    Check if a tree is a valid alert rule.
+    
+    A valid alert rule must:
+    - Be a tuple (not a terminal)
+    - Have "if_alert" at root
+    - Have correct arity (2 arguments: condition and message)
+    - Have valid children according to arities
+    
+    Args:
+        tree: Tree structure to validate
+        
+    Returns:
+        True if tree is a valid alert rule, False otherwise
+    """
+    if not isinstance(tree, tuple):
+        return False
+    if not tree:
+        return False
+    if tree[0] != "if_alert":
+        return False
+    if len(tree) != 3:  # if_alert requires 2 arguments
+        return False
+    # Recursively validate children
+    return is_valid_subtree(tree, ARITIES)
+
+
+def ensure_alert_root(tree: Any, rng: Optional[random.Random] = None) -> Any:
+    """
+    Ensure tree has if_alert at root, wrapping if necessary.
+    
+    If tree already has if_alert at root, returns as-is.
+    Otherwise, wraps tree: ("if_alert", tree, random_message)
+    
+    Args:
+        tree: Tree structure to repair
+        rng: Optional random number generator (for determinism)
+            If None, uses module-level random (less deterministic but backward compatible)
+        
+    Returns:
+        Tree with if_alert at root
+    """
+    if is_valid_alert_rule(tree):
+        return tree
+    
+    # Use provided RNG or module-level random (for backward compatibility)
+    # Note: For full determinism, callers should pass seeded RNG
+    if rng is not None:
+        message = rng.choice(MSG_TERMINALS)
+    else:
+        message = random.choice(MSG_TERMINALS)
+    
+    # Wrap tree with if_alert
+    return ("if_alert", tree, message)
 

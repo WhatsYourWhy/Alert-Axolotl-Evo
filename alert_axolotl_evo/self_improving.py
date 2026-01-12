@@ -1,9 +1,12 @@
 """Self-improving evolution wrapper that learns from results."""
 
 import json
+import logging
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from alert_axolotl_evo.analytics import (
     aggregate_config_performance,
@@ -26,7 +29,10 @@ from alert_axolotl_evo.visualization import (
     print_pattern_discovery_summary,
 )
 from alert_axolotl_evo.persistence import load_rule
-from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS, register_function, register_terminal
+from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS, register_function, register_terminal, unregister_function
+from alert_axolotl_evo.compiler import PrimitiveCompiler
+from alert_axolotl_evo.promotion import PromotionManager
+from alert_axolotl_evo.fitness import evaluate
 
 
 class SelfImprovingEvolver:
@@ -38,6 +44,8 @@ class SelfImprovingEvolver:
         auto_register: bool = True,
         adapt_data: bool = True,
         min_pattern_usage: int = 5,
+        enable_promotion_manager: bool = False,
+        library_budget: int = 50,
     ):
         self.results_dir = results_dir
         self.results_dir.mkdir(exist_ok=True, parents=True)
@@ -48,6 +56,16 @@ class SelfImprovingEvolver:
         self.auto_register = auto_register
         self.adapt_data = adapt_data
         self.min_pattern_usage = min_pattern_usage
+        self.enable_promotion_manager = enable_promotion_manager
+        
+        # Initialize Promotion Manager if enabled
+        self.promotion_manager: Optional[PromotionManager] = None
+        if self.enable_promotion_manager:
+            compiler = PrimitiveCompiler(evaluate)
+            self.promotion_manager = PromotionManager(compiler, library_budget=library_budget)
+            self.promoted_macros: List[str] = []
+        else:
+            self.promoted_macros: List[str] = []
     
     def run_and_learn(self, config: Config, run_id: str) -> Dict[str, Any]:
         """
@@ -96,10 +114,54 @@ class SelfImprovingEvolver:
         
         self.history.append(run_data)
         
+        # Process promotion manager if enabled
+        if self.enable_promotion_manager and self.promotion_manager:
+            self._process_promotion_manager(checkpoint_file)
+        
         # Learn from results
         self._update_learned_config()
         
         return run_data
+    
+    def _process_promotion_manager(self, checkpoint_file: Path):
+        """Process promotion manager with champions from checkpoint."""
+        if not checkpoint_file.exists():
+            return
+        
+        try:
+            from alert_axolotl_evo.persistence import load_checkpoint
+            checkpoint = load_checkpoint(checkpoint_file)
+            
+            # Extract champion history
+            champion_history = checkpoint.get("champion_history", [])
+            if not champion_history:
+                return
+            
+            # Convert to format expected by promotion manager
+            # Each entry in champion_history is (tree, fitness) tuple
+            champions = [
+                {"tree": tree, "fitness": fitness}
+                for tree, fitness in champion_history
+            ]
+            
+            # Get generation number from checkpoint
+            current_gen = checkpoint.get("generation", len(champion_history) - 1)
+            
+            # Process generation results
+            self.promotion_manager.process_generation_results(champions, current_gen)
+            
+            # Promote and prune
+            promoted = self.promotion_manager.promote_and_prune(
+                current_gen,
+                register_function,
+                unregister_function
+            )
+            
+            if promoted:
+                self.promoted_macros.extend(promoted)
+                logger.info(f"🎊 Promotion Manager: Promoted {len(promoted)} macros: {promoted}")
+        except Exception as e:
+            logger.warning(f"Promotion manager processing failed: {e}")
     
     def _update_learned_config(self):
         """Update learned optimal configuration from history."""
@@ -478,6 +540,15 @@ class SelfImprovingEvolver:
         except Exception:
             # Pattern discovery not available
             pass
+        
+        # Add promotion manager statistics if enabled
+        if self.enable_promotion_manager and self.promotion_manager:
+            report["promotion_manager"] = {
+                "active_macros_count": len(self.promotion_manager.active_library),
+                "promoted_macros": self.promoted_macros,
+                "candidate_families": len(self.promotion_manager.families),
+                "library_budget": self.promotion_manager.LIBRARY_BUDGET,
+            }
         
         return report
 

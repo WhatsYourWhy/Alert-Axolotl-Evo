@@ -81,16 +81,40 @@ FUNCTION_NAMES: List[str] = [
 ]
 
 
-def register_function(name: str, func: Callable, arity: int) -> None:
-    """Register a new function primitive."""
+def register_function(name: str, func: Callable, arity: int, needs_context: bool = False) -> None:
+    """
+    Register a new function primitive.
+    
+    Args:
+        name: Name of the primitive
+        func: Python callable
+        arity: Number of arguments
+        needs_context: If True, evaluator passes 'data' as first arg to func(data, *args)
+    """
     FUNCTIONS[name] = func
     ARITIES[name] = arity
+    
+    if needs_context:
+        func.needs_context = True
+        
     if name not in FUNCTION_NAMES:
         FUNCTION_NAMES.append(name)
+        FUNCTION_NAMES.sort()  # Maintain determinism
+
+
+def unregister_function(name: str) -> None:
+    """Unregister a function primitive (used for pruning)."""
+    if name in FUNCTIONS:
+        del FUNCTIONS[name]
+    if name in ARITIES:
+        del ARITIES[name]
+    if name in FUNCTION_NAMES:
+        FUNCTION_NAMES.remove(name)
+        # No need to re-sort after removal
 
 
 def register_terminal(value: Any) -> None:
-    """Register a new terminal value."""
+    """Register a terminal value (literals only)."""
     if value not in TERMINALS:
         TERMINALS.append(value)
 

@@ -1,11 +1,11 @@
 """Fitness evaluation and tree evaluation."""
 
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from alert_axolotl_evo.config import DataConfig, FitnessConfig
 from alert_axolotl_evo.data import DataLoader, MockDataLoader
-from alert_axolotl_evo.primitives import ALERT, FUNCTIONS
+from alert_axolotl_evo.primitives import ALERT, FUNCTIONS, ARITIES
 
 
 def generate_mock_data(seed: int, size: int = 100, anomaly_count: int = 8, anomaly_multiplier: float = 2.5) -> Tuple[List[float], List[bool]]:
@@ -33,84 +33,109 @@ def coerce_number(value: Any) -> float:
     return 0.0
 
 
+def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
+    """Call standard functions with appropriate type coercion."""
+    # Handle unary functions
+    if op == "not":
+        return func(bool(args[0]))
+    
+    # Handle statistical functions (expect list)
+    if op in ("avg", "max", "min", "sum", "count", "stddev"):
+        if isinstance(args[0], list):
+            numeric = [coerce_number(item) for item in args[0] if item is not None]
+            return func(numeric) if numeric else 0
+        return func([coerce_number(args[0])])
+    
+    # Handle percentile
+    if op == "percentile":
+        vals = args[0]
+        p = coerce_number(args[1])
+        if isinstance(vals, list):
+            numeric = [coerce_number(item) for item in vals if item is not None]
+            return func(numeric, p) if numeric else 0
+        return 0
+    
+    # Handle window functions
+    if op in ("window_avg", "window_max", "window_min"):
+        vals = args[0]
+        n = int(coerce_number(args[1]))
+        if isinstance(vals, list):
+            numeric = [coerce_number(item) for item in vals if item is not None]
+            return func(numeric, n) if numeric else 0
+        return 0
+    
+    # Handle binary comparison operators
+    if op in (">", "<", ">=", "<=", "==", "!="):
+        return func(coerce_number(args[0]), coerce_number(args[1]))
+    
+    # Handle binary logical operators
+    if op in ("and", "or"):
+        return func(bool(args[0]), bool(args[1]))
+    
+    # Fallback: try direct call
+    return func(*args)
+
+
 def _evaluate(tree: Any, data: Dict[str, Any]) -> Any:
-    """Recursively evaluate a tree."""
+    """
+    Recursively evaluate a tree with macro support.
+    Supports standard GP functions and Context-Aware Macros (0-arity).
+    """
+    # 1. Handle Lists (Batch Eval)
     if isinstance(tree, list):
         return [_evaluate(item, data) for item in tree]
-    if isinstance(tree, tuple):
-        if not tree:
-            return None
-        op = tree[0]
-        
-        # Handle if_alert
-        if op == "if_alert":
-            if len(tree) != 3:
-                return None
-            cond = _evaluate(tree[1], data)
-            msg = _evaluate(tree[2], data)
-            return ALERT(bool(cond), msg)
-        
-        # Handle unary functions
-        if op == "not":
-            if len(tree) != 2:
-                return None
-            val = _evaluate(tree[1], data)
-            return FUNCTIONS[op](bool(val))
-        
-        # Handle single-argument statistical functions
-        if op in ("avg", "max", "min", "sum", "count", "stddev"):
-            if len(tree) != 2:
-                return None
-            vals = _evaluate(tree[1], data)
-            if isinstance(vals, list):
-                numeric = [coerce_number(item) for item in vals if item is not None]
-                return FUNCTIONS[op](numeric) if numeric else 0
-            return FUNCTIONS[op]([coerce_number(vals)])
-        
-        # Handle percentile (2 args: vals, percentile)
-        if op == "percentile":
-            if len(tree) != 3:
-                return None
-            vals = _evaluate(tree[1], data)
-            p = coerce_number(_evaluate(tree[2], data))
-            if isinstance(vals, list):
-                numeric = [coerce_number(item) for item in vals if item is not None]
-                return FUNCTIONS[op](numeric, p) if numeric else 0
-            return 0
-        
-        # Handle window functions (2 args: vals, window_size)
-        if op in ("window_avg", "window_max", "window_min"):
-            if len(tree) != 3:
-                return None
-            vals = _evaluate(tree[1], data)
-            n = int(coerce_number(_evaluate(tree[2], data)))
-            if isinstance(vals, list):
-                numeric = [coerce_number(item) for item in vals if item is not None]
-                return FUNCTIONS[op](numeric, n) if numeric else 0
-            return 0
-        
-        # Handle binary comparison operators
-        if op in (">", "<", ">=", "<=", "==", "!="):
-            if len(tree) != 3:
-                return None
-            left = _evaluate(tree[1], data)
-            right = _evaluate(tree[2], data)
-            return FUNCTIONS[op](coerce_number(left), coerce_number(right))
-        
-        # Handle binary logical operators
-        if op in ("and", "or"):
-            if len(tree) != 3:
-                return None
-            left = _evaluate(tree[1], data)
-            right = _evaluate(tree[2], data)
-            return FUNCTIONS[op](bool(left), bool(right))
-        
-        # Unknown operator
-        return None
+
+    # 2. Handle Terminals (Leaves)
+    if not isinstance(tree, tuple):
+        if isinstance(tree, str) and tree in data:
+            return data[tree]
+        return tree
     
-    if isinstance(tree, str) and tree in data:
-        return data[tree]
-    return tree
+    if not tree:
+        return None
+
+    op = tree[0]
+
+    # 3. Handle Special 'if_alert' (returns string or None)
+    if op == "if_alert":
+        if len(tree) != 3:
+            return None
+        cond = _evaluate(tree[1], data)
+        msg = _evaluate(tree[2], data)
+        return ALERT(bool(cond), msg)
+
+    # 4. Generic Function Dispatch (supports macros)
+    func = FUNCTIONS.get(op)
+    if func:
+        # CRITICAL FIX: Arity enforcement
+        expected_arity = ARITIES.get(op)
+        if expected_arity is not None:
+            actual_arity = len(tree) - 1
+            if expected_arity != actual_arity:
+                # Wrong arity - return None (neutral failure)
+                return None
+        
+        # Evaluate children first (Standard GP)
+        # Note: For 0-arity macros, args will be empty.
+        try:
+            args = [_evaluate(child, data) for child in tree[1:]]
+        except Exception:
+            # Graceful failure for child eval errors
+            return None
+
+        try:
+            # MACRO DISPATCH: Inject context if requested
+            if getattr(func, "needs_context", False):
+                return func(data, *args)
+            else:
+                # Standard function dispatch
+                return _call_standard_function(op, args, func)
+        except Exception:
+            # Runtime protection (e.g. div/0, type errors)
+            return None
+
+    # Unknown operator
+    return None
 
 
 def evaluate(tree: Any, data: Dict[str, Any]) -> Any:

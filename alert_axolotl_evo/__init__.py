@@ -25,6 +25,8 @@ from alert_axolotl_evo.pattern_discovery import (
     suggest_new_primitives,
     analyze_primitive_usage,
 )
+from alert_axolotl_evo.compiler import PrimitiveCompiler
+from alert_axolotl_evo.promotion import PromotionManager
 
 __all__ = [
     "evolve",
@@ -51,5 +53,7 @@ __all__ = [
     "discover_common_patterns",
     "suggest_new_primitives",
     "analyze_primitive_usage",
+    "PrimitiveCompiler",
+    "PromotionManager",
 ]
 

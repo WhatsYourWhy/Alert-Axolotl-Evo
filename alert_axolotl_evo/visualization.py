@@ -300,3 +300,101 @@ def print_pattern_discovery_summary(patterns: Dict[str, Any]) -> None:
     logger.info("\n💡 The system is learning... evolving... becoming smarter!")
     logger.info("="*60)
 
+
+def announce_macro_promotion(name: str, lift: float, subtree: Tuple) -> None:
+    """
+    Dramatically announce a macro promotion to the active library.
+    
+    Args:
+        name: Name of the promoted macro
+        lift: Shrunken lift value (performance improvement)
+        subtree: The subtree structure being promoted
+    """
+    logger = logging.getLogger("promotion_manager")
+    
+    logger.info("\n" + "="*60)
+    logger.info("🎉 *MACRO PROMOTION CEREMONY* 🎉")
+    logger.info("="*60)
+    logger.info("✨ %s has been PROMOTED to the Active Library! ✨", name)
+    logger.info("📈 Performance Lift: %.2fx", lift)
+    
+    # Generate a fun name for the macro
+    from alert_axolotl_evo.visualization import generate_pattern_name
+    try:
+        pattern_name = generate_pattern_name(name, subtree)
+        logger.info("🏷️  Pattern Name: %s", pattern_name)
+    except Exception:
+        pass
+    
+    # Show subtree structure (truncated)
+    subtree_str = str(subtree)[:100]
+    logger.info("🔧 Structure: %s", subtree_str)
+    
+    if lift >= 1.10:
+        logger.info("🌟 Status: EXCEPTIONAL PERFORMANCE 🌟")
+    elif lift >= 1.05:
+        logger.info("⭐ Status: STRONG PERFORMANCE ⭐")
+    else:
+        logger.info("💫 Status: PROMISING PATTERN 💫")
+    
+    logger.info("🎊 The macro is now available for all future generations! 🎊")
+    logger.info("="*60)
+
+
+def announce_macro_retirement(name: str, reason: str) -> None:
+    """
+    Announce the retirement of a macro from the active library.
+    
+    Args:
+        name: Name of the retired macro
+        reason: Reason for retirement ("ghost" or "harmful")
+    """
+    logger = logging.getLogger("promotion_manager")
+    
+    if reason == "ghost":
+        logger.info("👻 %s has been RETIRED (Ghost: unused for 15+ generations)", name)
+        logger.info("   'Twas a noble macro, but its time has passed...")
+    elif reason == "harmful":
+        logger.info("💀 %s has been RETIRED (Harmful: lift < 0.99)", name)
+        logger.info("   The system has learned it was not helpful...")
+    else:
+        logger.info("🔄 %s has been RETIRED (%s)", name, reason)
+    
+    logger.info("   It will be removed from the active library.")
+
+
+def display_macro_library(active_library: Dict) -> None:
+    """
+    Display the current active macro library in a fun format.
+    
+    Args:
+        active_library: Dictionary of active macros (name -> PatternVariant)
+    """
+    logger = logging.getLogger("promotion_manager")
+    
+    if not active_library:
+        logger.info("📚 Macro Library: Empty (no macros promoted yet)")
+        return
+    
+    logger.info("\n" + "="*60)
+    logger.info("📚 ACTIVE MACRO LIBRARY 📚")
+    logger.info("="*60)
+    logger.info("Total Active Macros: %d", len(active_library))
+    
+    # Sort by lift (performance)
+    ranked = []
+    for name, variant in active_library.items():
+        lift = variant.stats.get_shrunken_lift()
+        ranked.append((name, lift, variant.stats.present_count, variant.stats.last_seen_gen))
+    
+    ranked.sort(key=lambda x: x[1], reverse=True)  # Sort by lift
+    
+    logger.info("\n🏆 Rankings (by Performance Lift):")
+    medals = ["🥇", "🥈", "🥉"]
+    for idx, (name, lift, count, last_gen) in enumerate(ranked):
+        medal = medals[idx] if idx < len(medals) else f"{idx+1}."
+        logger.info("%s %s", medal, name)
+        logger.info("   Lift: %.3fx | Uses: %d | Last Seen: Gen %d", lift, count, last_gen)
+    
+    logger.info("="*60)
+

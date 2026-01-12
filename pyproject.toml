@@ -32,6 +32,9 @@ yaml = ["pyyaml>=6.0"]
 [project.scripts]
 alert-axolotl-evo = "alert_axolotl_evo.main:main"
 
+[tool.setuptools]
+packages = ["alert_axolotl_evo"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

@@ -1,89 +1,103 @@
 """Genetic operators: crossover, mutation, selection, and initialization."""
 
 import random
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 from alert_axolotl_evo.primitives import ARITIES, BOOLEAN_FUNCTIONS, FUNCTION_NAMES, MSG_TERMINALS, TERMINALS
 from alert_axolotl_evo.tree import ensure_alert_root, get_subtree_paths, is_valid_subtree, node_count, replace_subtree
 
 
-def random_terminal() -> Any:
+def random_terminal(rng: Optional[random.Random] = None) -> Any:
     """Select a random terminal."""
-    return random.choice(TERMINALS)
+    if rng is None:
+        rng = random
+    return rng.choice(TERMINALS)
 
 
-def random_numeric_terminal() -> Any:
+def random_numeric_terminal(rng: Optional[random.Random] = None) -> Any:
     """Select a random numeric terminal (for condition generation)."""
+    if rng is None:
+        rng = random
     numeric_terminals = [t for t in TERMINALS if isinstance(t, (int, float)) or (isinstance(t, str) and t not in MSG_TERMINALS)]
-    return random.choice(numeric_terminals) if numeric_terminals else random.choice(TERMINALS)
+    return rng.choice(numeric_terminals) if numeric_terminals else rng.choice(TERMINALS)
 
 
-def random_boolean_function() -> str:
+def random_boolean_function(rng: Optional[random.Random] = None) -> str:
     """Select a random boolean-returning function."""
-    return random.choice(BOOLEAN_FUNCTIONS)
+    if rng is None:
+        rng = random
+    return rng.choice(BOOLEAN_FUNCTIONS)
 
 
-def random_function() -> str:
+def random_function(rng: Optional[random.Random] = None) -> str:
     """Select a random function."""
-    return random.choice(FUNCTION_NAMES)
+    if rng is None:
+        rng = random
+    return rng.choice(FUNCTION_NAMES)
 
 
-def grow_condition_subtree(depth: int, max_depth: int) -> Any:
+def grow_condition_subtree(depth: int, max_depth: int, rng: Optional[random.Random] = None) -> Any:
     """
     Grow method for condition subtrees.
     
     Conditions can contain:
-    - Boolean functions (>, <, >=, <=, ==, !=, and, or, not) at any level
+    - Boolean functions (>, <, >=, <=, and, or, not) at any level
     - Statistical functions (avg, max, min, etc.) that return numeric values
     - Numeric terminals and variable references
     
     At root level, prefers boolean functions (comparisons).
     Statistical functions are used to compute values for comparison.
     """
-    if depth >= max_depth or (depth > 0 and random.random() < 0.5):
+    if rng is None:
+        rng = random
+    
+    if depth >= max_depth or (depth > 0 and rng.random() < 0.5):
         # At leaf, prefer terminals or simple statistical functions
-        if random.random() < 0.4 and depth < max_depth:
+        if rng.random() < 0.4 and depth < max_depth:
             # Use avg("latency") for computing values
             return ("avg", "latency")
-        return random_numeric_terminal() if random.random() < 0.5 else "latency"
+        return random_numeric_terminal(rng) if rng.random() < 0.5 else "latency"
     
     # At root or higher levels, prefer boolean functions for structure
-    if depth == 0 or random.random() < 0.7:
+    if depth == 0 or rng.random() < 0.7:
         # Boolean function (comparison or logical)
-        func = random_boolean_function()
+        func = random_boolean_function(rng)
         if func == "not":
-            return (func, grow_condition_subtree(depth + 1, max_depth))
-        return (func, grow_condition_subtree(depth + 1, max_depth), grow_condition_subtree(depth + 1, max_depth))
+            return (func, grow_condition_subtree(depth + 1, max_depth, rng))
+        return (func, grow_condition_subtree(depth + 1, max_depth, rng), grow_condition_subtree(depth + 1, max_depth, rng))
     else:
         # Statistical function (returns numeric value for comparison)
-        func = random.choice(["avg", "max", "min"])
+        func = rng.choice(["avg", "max", "min"])
         # Statistical functions need a list - use "latency" variable
         return (func, "latency")
 
 
-def full_condition_subtree(depth: int, max_depth: int) -> Any:
+def full_condition_subtree(depth: int, max_depth: int, rng: Optional[random.Random] = None) -> Any:
     """
     Full method for condition subtrees.
     
     Conditions can contain boolean and statistical functions.
     """
+    if rng is None:
+        rng = random
+    
     if depth >= max_depth:
-        return random_numeric_terminal() if random.random() < 0.5 else "latency"
+        return random_numeric_terminal(rng) if rng.random() < 0.5 else "latency"
     
     # At root or higher levels, prefer boolean functions
-    if depth == 0 or random.random() < 0.7:
+    if depth == 0 or rng.random() < 0.7:
         # Boolean function
-        func = random_boolean_function()
+        func = random_boolean_function(rng)
         if func == "not":
-            return (func, full_condition_subtree(depth + 1, max_depth))
-        return (func, full_condition_subtree(depth + 1, max_depth), full_condition_subtree(depth + 1, max_depth))
+            return (func, full_condition_subtree(depth + 1, max_depth, rng))
+        return (func, full_condition_subtree(depth + 1, max_depth, rng), full_condition_subtree(depth + 1, max_depth, rng))
     else:
         # Statistical function (returns numeric value)
-        func = random.choice(["avg", "max", "min"])
+        func = rng.choice(["avg", "max", "min"])
         return (func, "latency")
 
 
-def make_alert_tree(depth: int, max_depth: int, use_full: bool = False) -> Any:
+def make_alert_tree(depth: int, max_depth: int, use_full: bool = False, rng: Optional[random.Random] = None) -> Any:
     """
     Create a valid alert rule tree with if_alert at root.
     
@@ -93,15 +107,19 @@ def make_alert_tree(depth: int, max_depth: int, use_full: bool = False) -> Any:
         depth: Current depth (should be 0 for root)
         max_depth: Maximum depth for condition subtree
         use_full: If True, use full method; otherwise use grow method
+        rng: Optional random number generator (for determinism)
         
     Returns:
         Valid alert rule tree with if_alert at root
     """
+    if rng is None:
+        rng = random
+    
     if use_full:
-        condition = full_condition_subtree(0, max_depth)
+        condition = full_condition_subtree(0, max_depth, rng)
     else:
-        condition = grow_condition_subtree(0, max_depth)
-    message = random.choice(MSG_TERMINALS)
+        condition = grow_condition_subtree(0, max_depth, rng)
+    message = rng.choice(MSG_TERMINALS)
     return ("if_alert", condition, message)
 
 
@@ -139,12 +157,21 @@ def full_tree(depth: int, max_depth: int) -> Any:
     return (func, full_tree(depth + 1, max_depth), full_tree(depth + 1, max_depth))
 
 
-def initialize_population(pop_size: int, min_depth: int, max_depth: int) -> List[Any]:
+def initialize_population(pop_size: int, min_depth: int, max_depth: int, rng: Optional[random.Random] = None) -> List[Any]:
     """
     Koza ramped half-and-half initialization.
     
     All trees are guaranteed to have if_alert at root (valid alert rules).
+    
+    Args:
+        pop_size: Size of population to generate
+        min_depth: Minimum tree depth
+        max_depth: Maximum tree depth
+        rng: Optional random number generator (for determinism)
     """
+    if rng is None:
+        rng = random
+    
     population: List[Any] = []
     depths = list(range(min_depth, max_depth + 1))
     while len(population) < pop_size:
@@ -153,10 +180,10 @@ def initialize_population(pop_size: int, min_depth: int, max_depth: int) -> List
                 break
             if len(population) % 2 == 0:
                 # Use grow method
-                population.append(make_alert_tree(0, depth, use_full=False))
+                population.append(make_alert_tree(0, depth, use_full=False, rng=rng))
             else:
                 # Use full method
-                population.append(make_alert_tree(0, depth, use_full=True))
+                population.append(make_alert_tree(0, depth, use_full=True, rng=rng))
     return population
 
 

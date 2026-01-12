@@ -204,12 +204,21 @@ def fitness_breakdown(
         )
     
     tp = fp = fn = 0
+    invalid_output_count = 0
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
         window = values[start : idx + 1]
         data = {"latency": window}
         result = evaluate(tree, data)
+        
+        # HARD VALIDITY GATE: Check output validity
+        # Valid output is str (alert message) or None (no alert)
+        if result is not None and not isinstance(result, str):
+            invalid_output_count += 1
+            # If we get invalid output, treat as no alert for this iteration
+            result = None
+        
         alerting = isinstance(result, str)
         if anomalies[idx] and alerting:
             tp += 1
@@ -218,6 +227,12 @@ def fitness_breakdown(
         if not anomalies[idx] and alerting:
             fp += 1
     
+    # Calculate metrics
+    total_rows = len(values)
+    alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
+    invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
+    
+    # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
     fp_rate = fp / possible_tp if possible_tp > 0 else 0.0
@@ -227,9 +242,26 @@ def fitness_breakdown(
     denom = (1 + beta_sq) * tp_rate + beta_sq * fn_rate + fp_rate
     f_beta = ((1 + beta_sq) * tp_rate / denom) if denom else 0.0
     score = f_beta * possible_tp
+    
+    # SOFT PENALTY: Penalize invalid outputs
+    if invalid_rate > 0.0:
+        score -= 0.5 * invalid_rate
+    
     # NO-ALERT PENALTY: Trees that never alert are useless
     if tp == 0 and fp == 0:
         score -= 5.0  # Explicit penalty that dominates bloat incentives
+    
+    # ALERT-RATE BAND PENALTY
+    if alert_rate < 0.002:  # Less than 0.2%
+        score -= 2.0
+    elif alert_rate > 0.20:  # More than 20%
+        score -= 3.0
+    
+    # MINIMUM TP FLOOR
+    if possible_tp > 0:
+        recall = tp / possible_tp
+        if recall < 0.1 and tp == 0:
+            score -= 3.0
     
     if fp > fitness_config.fp_threshold:
         score -= fitness_config.fp_penalty
@@ -248,6 +280,9 @@ def fitness_breakdown(
         "f_beta": f_beta,
         "score": score,
         "penalty": penalty,
+        "alert_rate": alert_rate,
+        "invalid_rate": invalid_rate,
+        "node_count": node_count(tree),
     }
 
 
@@ -321,9 +356,22 @@ def fitness(
         if not anomalies[idx] and alerting:
             fp += 1
     
+    # Calculate metrics
+    total_rows = len(values)
+    alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
+    invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
+    
     # HARD VALIDITY GATE: If too many invalid outputs, reject tree
-    if invalid_output_count > len(values) * 0.5:  # More than 50% invalid outputs
+    if invalid_rate > 0.5:  # More than 50% invalid outputs
         return -100.0
+    
+    # SOFT PENALTY: Penalize some invalid outputs (prefer robust trees)
+    # This gives gradient pressure before hitting the 50% hard gate
+    if invalid_rate > 0.0:
+        score_invalid_penalty = 0.5 * invalid_rate  # Small penalty per invalid output
+    else:
+        score_invalid_penalty = 0.0
+    
     # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
@@ -334,12 +382,28 @@ def fitness(
     denom = (1 + beta_sq) * tp_rate + beta_sq * fn_rate + fp_rate
     f_beta = ((1 + beta_sq) * tp_rate / denom) if denom else 0.0
     score = f_beta * possible_tp
-    # REMOVED: Hardcoded bonuses that reward trees containing "avg" and ">"
-    # These were causing semantically invalid trees to win
+    
+    # Apply invalid output penalty
+    score -= score_invalid_penalty
     
     # NO-ALERT PENALTY: Trees that never alert are useless
     if tp == 0 and fp == 0:
         score -= 5.0  # Explicit penalty that dominates bloat incentives
+    
+    # ALERT-RATE BAND PENALTY: Prefer rules that alert at reasonable rates
+    # Too low: < 0.2% (effectively never fires)
+    # Too high: > 20% (too noisy)
+    if alert_rate < 0.002:  # Less than 0.2%
+        score -= 2.0  # Penalty for too-low alert rate
+    elif alert_rate > 0.20:  # More than 20%
+        score -= 3.0  # Penalty for too-high alert rate
+    
+    # MINIMUM TP FLOOR: Soft constraint for minimum useful detection
+    # If we have labeled anomalies, require at least 1 TP (or recall >= 0.1)
+    if possible_tp > 0:
+        recall = tp / possible_tp
+        if recall < 0.1 and tp == 0:  # No detection at all
+            score -= 3.0  # Additional penalty for zero detection
     
     if fp > fitness_config.fp_threshold:
         score -= fitness_config.fp_penalty
@@ -405,6 +469,12 @@ def print_fitness_comparison(
     print(f"  TP: {champion_breakdown['tp']}, FP: {champion_breakdown['fp']}, FN: {champion_breakdown['fn']}")
     print(f"  TP Rate: {champion_breakdown['tp_rate']:.3f}, FP Rate: {champion_breakdown['fp_rate']:.3f}, FN Rate: {champion_breakdown['fn_rate']:.3f}")
     print(f"  F-beta: {champion_breakdown['f_beta']:.3f}")
+    # New metrics
+    alert_rate = champion_breakdown.get('alert_rate', 0.0)
+    invalid_rate = champion_breakdown.get('invalid_rate', 0.0)
+    node_count = champion_breakdown.get('node_count', 0)
+    print(f"  Alert Rate: {alert_rate:.3f} ({alert_rate*100:.2f}%), Invalid Rate: {invalid_rate:.3f} ({invalid_rate*100:.2f}%)")
+    print(f"  Node Count: {node_count}")
     
     # Baselines
     always_false = baseline_always_false(seed, gen, fitness_config, data_config, data_loader)

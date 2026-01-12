@@ -86,11 +86,14 @@ def evolve(
         champion_history = [(tree, fit) for tree, fit in checkpoint.get("champion_history", [])]
         logging.getLogger("evo").info(f"Loaded checkpoint from generation {checkpoint['generation']}, resuming from generation {start_gen}")
     else:
-        random.seed(seed)
+        # Create seeded RNG for determinism
+        rng = random.Random(seed)
+        random.seed(seed)  # Also set global for backward compatibility
         population = initialize_population(
             pop_size,
             config.evolution.min_depth,
             config.evolution.max_depth,
+            rng=rng,
         )
         for tree in select_top_bottom(population):
             announce_birth(tree)

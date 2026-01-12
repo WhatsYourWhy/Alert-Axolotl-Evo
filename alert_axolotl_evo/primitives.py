@@ -42,9 +42,11 @@ MSG_TERMINALS: List[str] = [
 ]
 
 # Boolean-returning functions (for condition generation)
+# Note: == and != removed for continuous metrics (equality is almost always useless for floats)
+# If approximate equality is needed, add a new primitive like approx_eq(value, target, tolerance)
 BOOLEAN_FUNCTIONS: List[str] = [
-    ">", "<", ">=", "<=", "==", "!=",
-    "and", "or", "not",
+    ">", "<", ">=", "<=",  # Comparison operators (no == or !=)
+    "and", "or", "not",    # Logical operators
 ]
 
 # Terminal values (backward compatibility - includes numeric, variable, and message terminals)

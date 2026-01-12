@@ -320,7 +320,8 @@ def fitness(
             # Update seed based on consistent_data config
             # If consistent_data is True, use same seed across generations
             # If False, use seed + gen (different data per generation)
-            if hasattr(data_config, 'consistent_data') and data_config.consistent_data:
+            consistent_data = getattr(data_config, 'consistent_data', True)
+            if consistent_data:
                 # Use base seed for consistent data across generations
                 data_loader.seed = seed
             else:

@@ -114,23 +114,35 @@ class MockDataLoader(DataLoader):
         total_anomaly_points = 0
         used_positions = set()
         
+        # Adaptive spacing: reduce spacing requirement if we need many anomalies
+        # If anomaly_count > 30% of size, reduce spacing to 1
+        # If anomaly_count > 50% of size, no spacing requirement
+        min_spacing = 3
+        anomaly_ratio = self.anomaly_count / self.size if self.size > 0 else 0
+        if anomaly_ratio > 0.5:
+            min_spacing = 0  # No spacing requirement for >50% anomalies
+        elif anomaly_ratio > 0.3:
+            min_spacing = 1  # Reduced spacing for >30% anomalies
+        
         while total_anomaly_points < self.anomaly_count:
             # Choose a random position that hasn't been used
             attempts = 0
             pos = None
-            while attempts < 100:
+            max_attempts = min(200, self.size * 2)  # More attempts for larger datasets
+            while attempts < max_attempts:
                 candidate = rng.randint(0, self.size - 1)
                 if candidate not in used_positions:
-                    # Check spacing (min 3 apart)
-                    if not any(abs(candidate - p) < 3 for p in used_positions):
+                    # Check spacing (adaptive)
+                    if min_spacing == 0 or not any(abs(candidate - p) < min_spacing for p in used_positions):
                         pos = candidate
                         break
                 attempts += 1
             
             if pos is None:
-                # Fallback: use any unused position
+                # Fallback: use any unused position (relax spacing if needed)
                 available = [i for i in range(self.size) if i not in used_positions]
                 if not available:
+                    # If we've exhausted all positions, we can't place more anomalies
                     break
                 pos = rng.choice(available)
             
@@ -138,7 +150,16 @@ class MockDataLoader(DataLoader):
             remaining = self.anomaly_count - total_anomaly_points
             
             # Choose anomaly type based on remaining count
-            if remaining == 1 or rng.random() < 0.6:
+            # When we're close to target or have many anomalies, prefer single-point
+            # to ensure we can reach exact count
+            use_single_point = (
+                remaining == 1 or 
+                remaining <= 3 or  # Last few anomalies should be single-point
+                anomaly_ratio > 0.4 or  # High density: prefer single-point
+                rng.random() < 0.7  # 70% chance for single-point
+            )
+            
+            if use_single_point:
                 # Single-point anomaly (spike or multiplier)
                 if rng.random() < 0.7:
                     multiplier = rng.uniform(1.5, 2.5)  # Spike
@@ -149,10 +170,13 @@ class MockDataLoader(DataLoader):
                 used_positions.add(pos)
                 total_anomaly_points += 1
             else:
-                # Multi-point anomaly (sustained or gradual)
+                # Multi-point anomaly (sustained or gradual) - only when we have room
                 if rng.random() < 0.5:  # Sustained
                     multiplier = rng.uniform(1.3, 1.8)
-                    duration = rng.randint(2, min(3, self.size - pos, remaining))
+                    max_duration = min(3, self.size - pos, remaining)
+                    duration = rng.randint(2, max_duration) if max_duration >= 2 else max_duration
+                    if duration < 1:
+                        duration = 1
                     for i in range(duration):
                         if pos + i < self.size and total_anomaly_points < self.anomaly_count:
                             values[pos + i] = values[pos + i] * multiplier
@@ -161,10 +185,13 @@ class MockDataLoader(DataLoader):
                             total_anomaly_points += 1
                 else:  # Gradual
                     peak_multiplier = rng.uniform(1.4, 2.0)
-                    duration = rng.randint(2, min(4, self.size - pos, remaining))
+                    max_duration = min(4, self.size - pos, remaining)
+                    duration = rng.randint(2, max_duration) if max_duration >= 2 else max_duration
+                    if duration < 1:
+                        duration = 1
                     for i in range(duration):
                         if pos + i < self.size and total_anomaly_points < self.anomaly_count:
-                            progress = i / max(duration - 1, 1)
+                            progress = i / max(duration - 1, 1) if duration > 1 else 0.0
                             multiplier = 1.0 + (peak_multiplier - 1.0) * progress
                             values[pos + i] = values[pos + i] * multiplier
                             anomalies[pos + i] = True

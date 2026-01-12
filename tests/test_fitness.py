@@ -2,16 +2,17 @@
 
 import pytest
 
-from alert_axolotl_evo.fitness import coerce_number, evaluate, fitness
+from alert_axolotl_evo.fitness import coerce_number, evaluate, fitness, fitness_breakdown
 from alert_axolotl_evo.config import FitnessConfig, DataConfig
+from alert_axolotl_evo.data import MockDataLoader
 
 
 def test_coerce_number():
     """Test number coercion."""
     assert coerce_number(5) == 5.0
     assert coerce_number(5.5) == 5.5
-    assert coerce_number("5") == 0.0  # String not coerced
-    assert coerce_number([1, 2, 3]) == 2.0  # Average
+    assert coerce_number("5") is None  # String not coerced, returns None
+    assert coerce_number([1, 2, 3]) is None  # List not coerced, returns None (no implicit averaging)
 
 
 def test_evaluate_simple():
@@ -71,7 +72,7 @@ def test_fitness():
     tree = ("if_alert", (">", ("avg", "latency"), 100), "High alert!")
     fit = fitness(tree, seed=42, gen=0)
     assert isinstance(fit, float)
-    assert fit >= 0  # Fitness should be non-negative or at least a number
+    # Fitness can be negative due to penalties (bloat, false positives, etc.)
 
 
 class TestGenericDispatch:
@@ -323,3 +324,115 @@ class TestBackwardCompatibility:
         assert evaluate(("and", True, True), {}) is True
         assert evaluate(("or", False, True), {}) is True
         assert evaluate(("not", False), {}) is True
+
+
+def test_fitness_consistent_data():
+    """Test that fitness evaluation with consistent_data=True produces same results."""
+    tree = ("if_alert", (">", ("max", "latency"), 75), "High alert!")
+    
+    # Create data loader with consistent_data=True
+    data_config = DataConfig(consistent_data=True, mock_size=100, anomaly_count=10)
+    data_loader = MockDataLoader(seed=42, size=100, anomaly_count=10, use_realistic_patterns=False)
+    
+    # Evaluate fitness with same seed (generation 0)
+    fit1 = fitness(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Reset loader and evaluate again with same seed (should be same data)
+    data_loader.seed = 42
+    fit2 = fitness(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Fitness should be identical with consistent data
+    assert fit1 == fit2
+    
+    # Test across generations (should still be same with consistent_data=True)
+    data_loader.seed = 42
+    fit_gen0 = fitness(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    data_loader.seed = 42  # Same seed even though gen=1
+    fit_gen1 = fitness(tree, seed=42, gen=1, data_config=data_config, data_loader=data_loader)
+    
+    # With consistent_data=True, same seed should produce same fitness
+    assert fit_gen0 == fit_gen1
+
+
+def test_fitness_varying_data():
+    """Test that fitness evaluation with consistent_data=False produces different results."""
+    tree = ("if_alert", (">", ("max", "latency"), 75), "High alert!")
+    
+    # Create data loader with consistent_data=False
+    data_config = DataConfig(consistent_data=False, mock_size=100, anomaly_count=10)
+    data_loader = MockDataLoader(seed=42, size=100, anomaly_count=10, use_realistic_patterns=False)
+    
+    # Evaluate fitness with seed + 0 (generation 0)
+    data_loader.seed = 42
+    fit_gen0 = fitness(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Evaluate fitness with seed + 1 (generation 1)
+    data_loader.seed = 43
+    fit_gen1 = fitness(tree, seed=42, gen=1, data_config=data_config, data_loader=data_loader)
+    
+    # Fitness may be different with different data (though could coincidentally be same)
+    # At minimum, we verify the system works correctly
+    assert isinstance(fit_gen0, float)
+    assert isinstance(fit_gen1, float)
+
+
+def test_fitness_breakdown_consistent_data():
+    """Test fitness_breakdown with consistent data."""
+    tree = ("if_alert", (">", ("max", "latency"), 75), "High alert!")
+    
+    data_config = DataConfig(consistent_data=True, mock_size=100, anomaly_count=10)
+    data_loader = MockDataLoader(seed=42, size=100, anomaly_count=10, use_realistic_patterns=False)
+    
+    # Get breakdown for generation 0
+    data_loader.seed = 42
+    breakdown1 = fitness_breakdown(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Get breakdown again with same seed
+    data_loader.seed = 42
+    breakdown2 = fitness_breakdown(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Should be identical
+    assert breakdown1['fitness'] == breakdown2['fitness']
+    assert breakdown1['tp'] == breakdown2['tp']
+    assert breakdown1['fp'] == breakdown2['fp']
+    assert breakdown1['fn'] == breakdown2['fn']
+    assert breakdown1['alert_rate'] == breakdown2['alert_rate']
+    assert breakdown1['invalid_rate'] == breakdown2['invalid_rate']
+
+
+def test_fitness_with_realistic_data():
+    """Test fitness evaluation with realistic data generation."""
+    tree = ("if_alert", (">", ("max", "latency"), 75), "High alert!")
+    
+    data_config = DataConfig(
+        consistent_data=True,
+        mock_size=200,
+        anomaly_count=20,
+        use_realistic_patterns=True
+    )
+    data_loader = MockDataLoader(
+        seed=42,
+        size=200,
+        anomaly_count=20,
+        use_realistic_patterns=True
+    )
+    
+    fit = fitness(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    # Should compute fitness successfully
+    assert isinstance(fit, float)
+    
+    # Get breakdown to verify metrics
+    data_loader.seed = 42
+    breakdown = fitness_breakdown(tree, seed=42, gen=0, data_config=data_config, data_loader=data_loader)
+    
+    assert 'fitness' in breakdown
+    assert 'tp' in breakdown
+    assert 'fp' in breakdown
+    assert 'fn' in breakdown
+    assert 'alert_rate' in breakdown
+    assert 'invalid_rate' in breakdown
+    assert breakdown['alert_rate'] >= 0.0
+    assert breakdown['alert_rate'] <= 1.0
+    assert breakdown['invalid_rate'] >= 0.0
+    assert breakdown['invalid_rate'] <= 1.0

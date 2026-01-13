@@ -3,7 +3,7 @@
 import logging
 import random
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.data import DataLoader, create_data_loader
@@ -35,7 +35,7 @@ def evolve(
     save_checkpoint_path: Optional[Path] = None,
     export_rule_path: Optional[Path] = None,
     data_loader: Optional[DataLoader] = None,
-) -> None:
+) -> Dict[str, Any]:
     """
     Main evolution loop.
     
@@ -49,6 +49,17 @@ def evolve(
         export_rule_path: Path to export final champion rule
         data_loader: Optional DataLoader instance (overrides config.data if provided)
                     Allows programmatic injection of custom data loaders or data from memory
+    
+    Returns:
+        Dictionary with:
+        - 'champion': The evolved champion tree
+        - 'champion_fitness': Champion fitness score
+        - 'generation': Final generation number
+        - 'seed': Random seed used
+        - 'baseline_passed': bool or None (None if comparison failed to compute)
+        - 'baseline_details': Dict with full comparison results or None
+        - 'champion_breakdown': Dict with fitness breakdown or None (even on failure)
+        - 'evidence_valid': bool - True if breakdown is valid for stats collection
     """
     if config is None:
         config = Config()
@@ -186,8 +197,38 @@ def evolve(
         # Fallback for Windows console encoding issues
         logging.getLogger("evo").info("Final Champion Tree: %s", champion)
     
-    # Print fitness breakdown comparison with baselines
-    # This is a critical invariant: champion must beat baselines (or warn/fail)
+    # Export champion FIRST (before any potential failure)
+    if export_rule_path:
+        save_rule(
+            champion,
+            champ_fit,
+            generations - 1,
+            export_rule_path,
+            metadata={
+                'seed': seed,
+                'config': config.to_dict() if config else None,
+            },
+        )
+        logging.getLogger("evo").info(f"Champion rule exported to {export_rule_path}")
+    
+    # Initialize result structure with defaults
+    result: Dict[str, Any] = {
+        'champion': champion,
+        'champion_fitness': champ_fit,
+        'generation': generations - 1,
+        'seed': seed,
+        'baseline_passed': None,
+        'baseline_details': None,
+        'champion_breakdown': None,
+        'evidence_valid': False,  # Default to invalid until proven otherwise
+    }
+    
+    # Compute breakdown and baseline comparison
+    # This should always run, even if it fails, to capture diagnostics
+    baseline_comparison = None
+    champion_breakdown = None
+    evidence_valid = False
+    
     try:
         champion_breakdown = fitness_breakdown(
             champion,
@@ -197,7 +238,24 @@ def evolve(
             config.data,
             data_loader,
         )
-        baseline_passed = print_fitness_comparison(
+        
+        # Check evidence validity: breakdown must be computed on same dataset
+        # and not hit hard gates (invalid_rate > 0.5, eval errors, etc.)
+        invalid_rate = champion_breakdown.get('invalid_rate', 0.0)
+        has_hard_gate_failure = invalid_rate > 0.5
+        has_eval_errors = champion_breakdown.get('eval_error', False)
+        
+        # Evidence is valid if:
+        # 1. Breakdown computed successfully
+        # 2. No hard gate failure (invalid_rate <= 0.5)
+        # 3. No eval errors
+        evidence_valid = (
+            champion_breakdown is not None and
+            not has_hard_gate_failure and
+            not has_eval_errors
+        )
+        
+        baseline_comparison = print_fitness_comparison(
             champion,
             champion_breakdown,
             seed,
@@ -207,29 +265,25 @@ def evolve(
             data_loader,
         )
         
-        # Enforce baseline comparison invariant (configurable)
-        # See docs/design_contract.md: Fitness Invariants
-        if config.fitness.enforce_baseline_comparison and not baseline_passed:
-            error_msg = (
-                "FITNESS INVARIANT VIOLATION: Champion does not beat all baselines. "
-                "This indicates alignment may be broken or evolution found a loophole. "
-                "See docs/FITNESS_ALIGNMENT_VALIDATION.md for troubleshooting."
-            )
-            logging.getLogger("evo").error(error_msg)
-            raise ValueError(error_msg)
-    except ValueError as e:
-        # Re-raise baseline comparison failures (these are invariant violations)
-        if "FITNESS INVARIANT VIOLATION" in str(e):
-            raise
-        # Fall through to warning for other ValueErrors
-        logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")
+        # Log baseline definitions for debugging
+        logger = logging.getLogger("evo")
+        logger.info("Baseline definitions:")
+        for name, defn in baseline_comparison['baseline_definitions'].items():
+            logger.info(f"  {name}: {defn['tree']} (threshold={defn.get('threshold')})")
+        
+        result['baseline_passed'] = baseline_comparison['baseline_passed']
+        result['baseline_details'] = baseline_comparison
+        
     except Exception as e:
         logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")
+        # Evidence is invalid if breakdown computation failed
+        evidence_valid = False
     
-    # Export rule if requested
-    if export_rule_path:
-        save_rule(champion, champ_fit, generations - 1, export_rule_path)
-        logging.getLogger("evo").info(f"Champion rule exported to {export_rule_path}")
+    # Always include breakdown and evidence validity, even on failure
+    result['champion_breakdown'] = champion_breakdown
+    result['evidence_valid'] = evidence_valid
     
     logging.getLogger("evo").info("Evolution complete. The fittest guardian survives... for now. 🌱💀🐉")
+    
+    return result
 

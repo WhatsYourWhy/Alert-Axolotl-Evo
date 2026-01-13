@@ -70,17 +70,26 @@ class PromotionManager:
         self.MIN_EVIDENCE_FOR_GHOST = 5  # Minimum total observations before ghost pruning (prevents "never got a chance" evictions)
         self.MIN_EVIDENCE_FOR_HARM = 10  # Minimum total observations before harmful pruning (prevents fluke early demotions)
 
-    def process_generation_results(self, champions: List[Dict], current_gen: int):
+    def process_generation_results(
+        self, 
+        champions: List[Dict], 
+        current_gen: int,
+        evidence_valid: bool = True,
+    ):
         """
         Updates stats using Complement Method (Total - Present = Absent).
         Efficiency: O(Present_Variants) instead of O(All_Variants * Champions).
         
         Args:
             champions: List of {tree, fitness} dicts from this generation
-            current_gen: Current generation number (for tracking last_seen)
-                Note: current_gen is the monotonic economic time index (a "market tick"),
-                not necessarily the GP generation number.
+            current_gen: Current generation number (monotonic economic time index)
+            evidence_valid: True if breakdown is valid for stats collection.
+                If False, this method should be a no-op (caller should skip).
         """
+        # Guard: don't process invalid evidence
+        if not evidence_valid:
+            return
+        
         # Micro-batch guard: prevent noise from tiny batches
         if len(champions) < 2:
             return

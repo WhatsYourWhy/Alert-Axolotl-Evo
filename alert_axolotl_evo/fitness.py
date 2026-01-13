@@ -27,6 +27,29 @@ from alert_axolotl_evo.primitives import ALERT, FUNCTIONS, ARITIES
 from alert_axolotl_evo.tree import is_valid_alert_rule, node_count, is_self_comparison
 
 
+class BaselineComparisonFailed(RuntimeError):
+    """
+    Raised when evolved champion fails to beat baseline comparisons.
+    
+    This is a fitness invariant violation, not a runtime bug. It indicates
+    that alignment may be broken or evolution found a loophole.
+    
+    Attributes:
+        champion_breakdown: Fitness breakdown of the champion
+        baselines: Dictionary of baseline breakdowns
+        message: Human-readable error message
+    """
+    def __init__(
+        self,
+        message: str,
+        champion_breakdown: Dict[str, Any],
+        baselines: Dict[str, Dict[str, Any]],
+    ):
+        super().__init__(message)
+        self.champion_breakdown = champion_breakdown
+        self.baselines = baselines
+
+
 def generate_mock_data(seed: int, size: int = 100, anomaly_count: int = 8, anomaly_multiplier: float = 2.5) -> Tuple[List[float], List[bool]]:
     """Generate deterministic mock latency data with anomalies."""
     rng = random.Random(seed)
@@ -282,12 +305,19 @@ def fitness_breakdown(
     
     tp = fp = fn = 0
     invalid_output_count = 0
+    eval_error_occurred = False
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
         window = values[start : idx + 1]
         data = {"latency": window}
-        result = evaluate(tree, data)
+        
+        try:
+            result = evaluate(tree, data)
+        except Exception:
+            # Eval error occurred - mark evidence as invalid
+            eval_error_occurred = True
+            result = None
         
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
@@ -373,6 +403,9 @@ def fitness_breakdown(
     penalty = fitness_config.bloat_penalty * node_count(tree)
     final_fitness = score - penalty
     
+    # Determine consistent_data flag for provenance
+    consistent_data = getattr(data_config, 'consistent_data', True)
+    
     return {
         "fitness": final_fitness,
         "tp": tp,
@@ -392,6 +425,13 @@ def fitness_breakdown(
         "alert_rate": alert_rate,
         "invalid_rate": invalid_rate,
         "node_count": node_count(tree),
+        "eval_error": eval_error_occurred,
+        "data_provenance": {
+            "seed": seed,
+            "gen": gen,
+            "consistent_data": consistent_data,
+            "data_loader_type": type(data_loader).__name__ if data_loader else "mock",
+        },
     }
 
 
@@ -714,7 +754,7 @@ def print_fitness_comparison(
     fitness_config: Optional[FitnessConfig] = None,
     data_config: Optional[DataConfig] = None,
     data_loader: Optional[DataLoader] = None,
-) -> bool:
+) -> Dict[str, Any]:
     """
     Print fitness breakdown comparing champion to baselines.
     
@@ -740,8 +780,12 @@ def print_fitness_comparison(
         data_loader: Optional data loader
     
     Returns:
-        bool: True if champion beats all baselines, False otherwise.
-        This return value can be used to enforce baseline comparison as an invariant.
+        Dictionary with:
+        - 'baseline_passed': bool
+        - 'champion_breakdown': Dict
+        - 'baselines': Dict[str, Dict] with keys 'always_false', 'always_true', 'random'
+        - 'comparison': Dict with improvement deltas
+        - 'baseline_definitions': Dict with baseline tree definitions
     """
     print("\n" + "=" * 70)
     print("  FITNESS BREAKDOWN COMPARISON")
@@ -770,7 +814,8 @@ def print_fitness_comparison(
     # Baselines
     always_false = baseline_always_false(seed, gen, fitness_config, data_config, data_loader)
     always_true = baseline_always_true(seed, gen, fitness_config, data_config, data_loader)
-    random_baseline = baseline_random(seed, gen, fitness_config, data_config, data_loader, threshold=50.0)
+    threshold = 50.0  # Default threshold for random baseline
+    random_baseline = baseline_random(seed, gen, fitness_config, data_config, data_loader, threshold=threshold)
     
     print(f"\nBASELINES:")
     print(f"  Always-False: Fitness={always_false['fitness']:.3f}, TP={always_false['tp']}, FP={always_false['fp']}, FN={always_false['fn']}")
@@ -799,5 +844,29 @@ def print_fitness_comparison(
     
     print("=" * 70 + "\n")
     
-    return baseline_passed
+    # Return structured comparison result
+    comparison_result = {
+        'baseline_passed': baseline_passed,
+        'champion_breakdown': champion_breakdown,
+        'baselines': {
+            'always_false': always_false,
+            'always_true': always_true,
+            'random': random_baseline,
+        },
+        'comparison': {
+            'vs_always_false': improvement_over_false,
+            'vs_always_true': improvement_over_true,
+            'vs_random': improvement_over_random,
+        },
+        'baseline_definitions': {
+            'always_false': {'tree': ("if_alert", False, "Never alerts"), 'threshold': None},
+            'always_true': {'tree': ("if_alert", True, "Always alerts"), 'threshold': None},
+            'random': {
+                'tree': ("if_alert", (">", ("avg", "latency"), threshold), "Random threshold"),
+                'threshold': threshold,
+            },
+        },
+    }
+    
+    return comparison_result
 

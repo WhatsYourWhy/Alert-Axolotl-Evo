@@ -33,7 +33,7 @@ class FitnessConfig:
     bloat_penalty: float = 0.005
     fp_threshold: int = 40
     fp_penalty: float = 5.0
-    enforce_baseline_comparison: bool = True  # If True, evolution fails if champion doesn't beat baselines
+    enforce_baseline_comparison: bool = False  # If True, evolution fails if champion doesn't beat baselines. Default False for dev, True for CI/release
 
 
 @dataclass

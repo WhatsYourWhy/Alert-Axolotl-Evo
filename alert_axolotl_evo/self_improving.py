@@ -124,14 +124,66 @@ class SelfImprovingEvolver:
         output_file = self.results_dir / f"{run_id}_champion.json"
         checkpoint_file = self.results_dir / f"checkpoint_{run_id}.json"
         
-        evolve(
+        evolution_result = evolve(
             config=adapted_config,
             export_rule_path=output_file,
             save_checkpoint_path=checkpoint_file,
         )
         
-        # Analyze results
+        # Extract baseline fields (always present, even if None)
+        baseline_passed = evolution_result.get('baseline_passed')
+        baseline_details = evolution_result.get('baseline_details')
+        champion_breakdown = evolution_result.get('champion_breakdown')
+        evidence_valid = evolution_result.get('evidence_valid', False)
+        
+        # Check baseline comparison at orchestrator level
+        should_enforce = (
+            self.enable_promotion_manager or  # Economy needs quality signal
+            (adapted_config.fitness.enforce_baseline_comparison)  # Explicit user override
+        )
+        
+        if should_enforce and baseline_passed is False:
+            # Export diagnostics before raising
+            diagnostic_file = self.results_dir / f"{run_id}_baseline_failure.json"
+            diagnostic_data = {
+                'run_id': run_id,
+                'champion': evolution_result['champion'],
+                'champion_fitness': evolution_result['champion_fitness'],
+                'baseline_details': baseline_details,
+                'champion_breakdown': champion_breakdown,
+                'evidence_valid': evidence_valid,
+                'config': adapted_config.to_dict(),
+                'seed': evolution_result['seed'],
+            }
+            with open(diagnostic_file, 'w') as f:
+                json.dump(diagnostic_data, f, indent=2)
+            
+            error_msg = (
+                "FITNESS INVARIANT VIOLATION: Champion does not beat all baselines. "
+                "This indicates alignment may be broken or evolution found a loophole. "
+                f"Diagnostics exported to {diagnostic_file}. "
+                "See docs/FITNESS_ALIGNMENT_VALIDATION.md for troubleshooting."
+            )
+            logger.error(error_msg)
+            
+            from alert_axolotl_evo.fitness import BaselineComparisonFailed
+            raise BaselineComparisonFailed(
+                error_msg,
+                champion_breakdown or {},
+                baseline_details['baselines'] if baseline_details else {},
+            )
+        
+        # If baseline failed but we're not enforcing, mark it in the result
+        if baseline_passed is False:
+            logger.warning(
+                "Champion did not beat baselines, but enforcement is disabled. "
+                "This run will not be used for promotion."
+            )
+        
+        # Analyze results (existing code)
         result = load_rule(output_file)
+        
+        # Build run_data with FIRST-CLASS baseline fields
         run_data = {
             "run_id": run_id,
             "config": adapted_config.to_dict(),
@@ -139,21 +191,44 @@ class SelfImprovingEvolver:
             "generation": result["generation"],
             "rule_complexity": result["metadata"]["node_count"],
             "rule_hash": result["metadata"]["hash"],
+            # FIRST-CLASS baseline fields (always present)
+            "baseline_passed": baseline_passed,
+            "baseline_details": baseline_details,  # Full comparison dict
+            "champion_breakdown": champion_breakdown,  # Full breakdown dict
+            "evidence_valid": evidence_valid,  # True if valid for stats collection
         }
         
+        # Persist to history (for auditing economics later)
         self.history.append(run_data)
         
         # Process promotion manager if enabled
+        # Pass evidence_valid flag to prevent learning from garbage
         if self.enable_promotion_manager and self.promotion_manager:
-            self._process_promotion_manager(checkpoint_file)
+            self._process_promotion_manager(
+                checkpoint_file,
+                evidence_valid=evidence_valid,
+                baseline_passed=baseline_passed,
+            )
         
         # Learn from results
         self._update_learned_config()
         
         return run_data
     
-    def _process_promotion_manager(self, checkpoint_file: Path):
-        """Process promotion manager with champions from checkpoint."""
+    def _process_promotion_manager(
+        self, 
+        checkpoint_file: Path,
+        evidence_valid: bool = True,
+        baseline_passed: Optional[bool] = None,
+    ):
+        """
+        Process promotion manager with champions from checkpoint.
+        
+        Args:
+            checkpoint_file: Path to checkpoint file
+            evidence_valid: True if breakdown is valid for stats collection
+            baseline_passed: True if champion beat baselines (None if not computed)
+        """
         if not checkpoint_file.exists():
             return
         
@@ -167,44 +242,59 @@ class SelfImprovingEvolver:
                 return
             
             # Convert to format expected by promotion manager
-            # Each entry in champion_history is (tree, fitness) tuple
             champions = [
                 {"tree": tree, "fitness": fitness}
                 for tree, fitness in champion_history
             ]
             
-            # Use monotonic economic tick (not checkpoint generation which resets per run)
-            # This ensures ghost pruning works correctly across multiple runs
             current_gen = self.economy_tick
             
-            # Policy guard: minimum batch size to update the market this tick
-            # (prevents noisy economics from tiny batches)
-            # Note: promotion.py has its own < 2 defensive guard for safety
+            # Policy guard: minimum batch size
             if len(champions) < self.min_promo_batch:
                 logger.debug(
                     f"SKIP: batch too small (batch_size={len(champions)}, "
                     f"min_required={self.min_promo_batch}, economy_tick={self.economy_tick})"
                 )
-                # Increment tick (wall-clock run semantics: time progresses even without market update)
-                # This ensures ghost pruning works: patterns age even if runs are skipped
-                # The debug log above records metadata (batch_size, economy_tick) for debugging gaps
                 self.economy_tick += 1
                 return
             
-            # Always update stats if batch is adequate (evidence accumulation from day one)
-            # This happens regardless of warmup period
-            self.promotion_manager.process_generation_results(champions, current_gen)
+            # EVIDENCE VALIDITY CHECK: Only collect stats if evidence is valid
+            # "Market closed" (baseline failed) but "data still valid" (evidence_valid=True)
+            # means we can collect stats but not promote/prune
+            market_closed = (baseline_passed is False)
+            can_collect_stats = evidence_valid
             
-            # Warmup guard: only promote/prune after warmup period to prevent early noise
-            # Warmup is based on economy_tick (monotonic run index), not GP generation
-            # Tick 0..(warmup-1): stats only (evidence collection)
-            # Tick warmup..: market allowed (promotion/pruning)
-            # Note: current_gen passed to process_generation_results must match economy_tick
-            # because PromotionManager uses (current_gen - last_seen_gen) for ghost pruning
+            if can_collect_stats:
+                # Stats collection is fine if breakdown is valid
+                # This happens even if baseline failed (market closed)
+                self.promotion_manager.process_generation_results(
+                    champions, 
+                    current_gen,
+                    evidence_valid=True,  # Explicit flag
+                )
+            else:
+                # Invalid evidence: eval errors, hard gate failure, data mismatch
+                # Don't count toward pattern lift stats
+                logger.warning(
+                    f"SKIP stats collection: evidence invalid "
+                    f"(eval_error or invalid_rate > 0.5 or data mismatch). "
+                    f"Run {current_gen} marked as invalid evidence."
+                )
+                # Still increment tick (time progresses)
+                self.economy_tick += 1
+                return
+            
+            # Warmup guard: only promote/prune after warmup period
             if self.economy_tick < self.promo_warmup_ticks:
                 logger.debug(f"SKIP: warmup period (tick {self.economy_tick} < {self.promo_warmup_ticks})")
+            elif market_closed:
+                # Baseline failed: market closed, no promotion/pruning
+                logger.info(
+                    "Baseline comparison failed - skipping promotion/prune this tick "
+                    "(fitness signal is suspect, but stats collected if evidence_valid=True)"
+                )
             else:
-                # Promote and prune (market decisions allowed after warmup)
+                # Normal flow: promote and prune
                 promoted = self.promotion_manager.promote_and_prune(
                     current_gen,
                     register_function,

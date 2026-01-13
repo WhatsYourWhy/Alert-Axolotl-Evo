@@ -308,6 +308,13 @@ def fitness_breakdown(
     tp = fp = fn = 0
     invalid_output_count = 0
     exception_count = 0  # Track actual exceptions during evaluation
+    total_rows = len(values)
+    
+    # Early rejection threshold: sample first 10% to detect invalid trees quickly
+    # This avoids wasting compute on clearly invalid trees (e.g., bool-operator type errors)
+    early_rejection_sample_size = max(10, total_rows // 10)  # At least 10 samples, or 10% of data
+    early_rejected = False
+    
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
@@ -345,20 +352,38 @@ def fitness_breakdown(
             fn += 1
         if not anomalies[idx] and alerting:
             fp += 1
+        
+        # EARLY REJECTION: If we've sampled enough and invalid_rate is high, short-circuit
+        # This avoids wasting compute on clearly invalid trees (e.g., bool-operator type errors)
+        if idx + 1 >= early_rejection_sample_size and not early_rejected:
+            early_invalid_rate = invalid_output_count / (idx + 1)
+            # If early sample shows >50% invalid, short-circuit evaluation
+            # We'll use partial data for breakdown (still useful for diagnostics)
+            if early_invalid_rate > 0.5:
+                early_rejected = True
+                # Break early - we have enough evidence it's invalid
+                # We'll use partial data for breakdown (still useful for diagnostics)
+                break
     
     # Calculate metrics
-    total_rows = len(values)
-    alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
-    invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
-    exception_rate = exception_count / total_rows if total_rows > 0 else 0.0
+    # If early rejected, use partial data (idx+1 samples evaluated)
+    evaluated_rows = idx + 1 if early_rejected else total_rows
+    alert_rate = (tp + fp) / evaluated_rows if evaluated_rows > 0 else 0.0
+    invalid_rate = invalid_output_count / evaluated_rows if evaluated_rows > 0 else 0.0
+    exception_rate = exception_count / evaluated_rows if evaluated_rows > 0 else 0.0
     
     # Semantic invalidity: invalid outputs (type errors, semantic errors)
     # This is separate from actual exceptions thrown by the engine
     invalid_evaluation = invalid_rate > 0.5
     
     # Calculate possible_tp from actual anomalies in data
-    possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
-    normal_count = total_rows - possible_tp
+    # If early rejected, use partial anomalies data
+    if early_rejected:
+        evaluated_anomalies = anomalies[:evaluated_rows] if anomalies else []
+        possible_tp = sum(evaluated_anomalies) if evaluated_anomalies else 0
+    else:
+        possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
+    normal_count = evaluated_rows - possible_tp
     tp_rate = tp / possible_tp if possible_tp > 0 else 0.0
     fp_rate = fp / possible_tp if possible_tp > 0 else 0.0  # Domain metric: FP per anomaly
     fn_rate = fn / possible_tp if possible_tp > 0 else 0.0
@@ -560,6 +585,11 @@ def fitness(
     
     tp = fp = fn = 0
     invalid_output_count = 0
+    total_rows = len(values)
+    
+    # Early rejection threshold: sample first 10% to detect invalid trees quickly
+    early_rejection_sample_size = max(10, total_rows // 10)  # At least 10 samples, or 10% of data
+    
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
@@ -590,9 +620,16 @@ def fitness(
             fn += 1
         if not anomalies[idx] and alerting:
             fp += 1
+        
+        # EARLY REJECTION: If we've sampled enough and invalid_rate is high, short-circuit
+        # This avoids wasting compute on clearly invalid trees
+        if idx + 1 >= early_rejection_sample_size:
+            early_invalid_rate = invalid_output_count / (idx + 1)
+            # If early sample shows >50% invalid, reject immediately
+            if early_invalid_rate > 0.5:
+                return -100.0
     
     # Calculate metrics
-    total_rows = len(values)
     alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
     invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
     

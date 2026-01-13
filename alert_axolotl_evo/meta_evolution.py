@@ -123,9 +123,16 @@ def evaluate_config_genome(genome: ConfigGenome,
     # Run evolution with temporary output
     temp_output = Path("temp_meta_eval.json")
     try:
-        evolve(config=config, export_rule_path=temp_output)
+        evolution_result = evolve(config=config, export_rule_path=temp_output)
         
-        # Load result
+        # Use return value if available (preferred - includes baseline fields)
+        if evolution_result and evolution_result.get('champion_fitness') is not None:
+            fitness = evolution_result['champion_fitness']
+            if temp_output.exists():
+                temp_output.unlink()
+            return fitness
+        
+        # Load result (fallback for backward compatibility)
         if temp_output.exists():
             result = load_rule(temp_output)
             fitness = result.get("fitness", 0.0)

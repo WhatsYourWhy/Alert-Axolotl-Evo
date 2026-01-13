@@ -305,19 +305,14 @@ def fitness_breakdown(
     
     tp = fp = fn = 0
     invalid_output_count = 0
-    eval_error_occurred = False
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
         window = values[start : idx + 1]
         data = {"latency": window}
         
-        try:
-            result = evaluate(tree, data)
-        except Exception:
-            # Eval error occurred - mark evidence as invalid
-            eval_error_occurred = True
-            result = None
+        # evaluate() already catches exceptions and returns None, so we don't need try/except here
+        result = evaluate(tree, data)
         
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
@@ -347,6 +342,11 @@ def fitness_breakdown(
     total_rows = len(values)
     alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
     invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
+    
+    # Set eval_error flag: hard gate failure (invalid_rate > 0.5) indicates evaluation problems
+    # Since evaluate() already catches exceptions and returns None, we use invalid_rate as proxy
+    # for evaluation issues (invalid outputs, type errors, etc.)
+    eval_error_occurred = invalid_rate > 0.5
     
     # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count

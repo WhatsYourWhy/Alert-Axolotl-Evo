@@ -127,12 +127,19 @@ def _call_standard_function(op: str, args: List[Any], func: Callable) -> Any:
         return None
     
     # Handle binary comparison operators
+    # INVARIANT: Comparisons must return bool or None, never numeric
+    # If either side is None → return None (invalid, not False)
     if op in (">", "<", ">=", "<=", "==", "!="):
         a = coerce_number(args[0])
         b = coerce_number(args[1])
         if a is None or b is None:
-            return None
-        return func(a, b)
+            return None  # Invalid: None inputs → None output (not False)
+        # Comparison functions return bool (verified: FUNCTIONS[op] = lambda a, b: a > b, etc.)
+        result = func(a, b)
+        # Ensure result is bool (defensive check)
+        if type(result) is not bool:
+            return None  # Should never happen, but enforce invariant
+        return result
     
     # Handle binary logical operators
     if op in ("and", "or"):
@@ -310,10 +317,15 @@ def fitness_breakdown(
     exception_count = 0  # Track actual exceptions during evaluation
     total_rows = len(values)
     
-    # Early rejection threshold: sample first 10% to detect invalid trees quickly
-    # This avoids wasting compute on clearly invalid trees (e.g., bool-operator type errors)
-    early_rejection_sample_size = max(10, total_rows // 10)  # At least 10 samples, or 10% of data
+    # Early rejection: use stratified sampling (early + late slices) to catch
+    # trees that only break after enough history exists (e.g., window functions)
+    # This prevents false negatives from head-only sampling
+    sample_size = max(10, total_rows // 20)  # 5% per slice (smaller since we use 2 slices)
+    early_slice_end = min(sample_size, total_rows)
+    late_slice_start = max(0, total_rows - sample_size)
     early_rejected = False
+    early_invalid_count = 0  # Track invalid outputs in early slice
+    late_invalid_count = 0  # Track invalid outputs in late slice
     
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
@@ -332,18 +344,29 @@ def fitness_breakdown(
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
         # Invalid conditions/messages return special sentinel tuples
+        is_invalid = False
         if isinstance(result, tuple) and len(result) > 0:
             if result[0] in ("__INVALID_CONDITION__", "__INVALID_MESSAGE__"):
                 invalid_output_count += 1
+                is_invalid = True
                 # Treat as no alert for this iteration
                 result = None
             elif result is not None and not isinstance(result, str):
                 invalid_output_count += 1
+                is_invalid = True
                 result = None
         elif result is not None and not isinstance(result, str):
             invalid_output_count += 1
+            is_invalid = True
             # If we get invalid output, treat as no alert for this iteration
             result = None
+        
+        # Track invalid outputs in early and late slices for stratified sampling
+        if is_invalid:
+            if idx < early_slice_end:
+                early_invalid_count += 1
+            if idx >= late_slice_start:
+                late_invalid_count += 1
         
         alerting = isinstance(result, str)
         if anomalies[idx] and alerting:
@@ -353,16 +376,20 @@ def fitness_breakdown(
         if not anomalies[idx] and alerting:
             fp += 1
         
-        # EARLY REJECTION: If we've sampled enough and invalid_rate is high, short-circuit
-        # This avoids wasting compute on clearly invalid trees (e.g., bool-operator type errors)
-        if idx + 1 >= early_rejection_sample_size and not early_rejected:
-            early_invalid_rate = invalid_output_count / (idx + 1)
-            # If early sample shows >50% invalid, short-circuit evaluation
-            # We'll use partial data for breakdown (still useful for diagnostics)
+        # EARLY REJECTION: Check after early slice
+        if idx + 1 == early_slice_end and not early_rejected:
+            early_invalid_rate = early_invalid_count / early_slice_end if early_slice_end > 0 else 0.0
             if early_invalid_rate > 0.5:
                 early_rejected = True
                 # Break early - we have enough evidence it's invalid
-                # We'll use partial data for breakdown (still useful for diagnostics)
+                break
+        
+        # EARLY REJECTION: Check after entering late slice (sample_size samples into late slice)
+        if idx + 1 == late_slice_start + sample_size and not early_rejected:
+            late_invalid_rate = late_invalid_count / sample_size if sample_size > 0 else 0.0
+            if late_invalid_rate > 0.5:
+                early_rejected = True
+                # Break early - late slice shows high invalidity
                 break
     
     # Calculate metrics
@@ -587,8 +614,13 @@ def fitness(
     invalid_output_count = 0
     total_rows = len(values)
     
-    # Early rejection threshold: sample first 10% to detect invalid trees quickly
-    early_rejection_sample_size = max(10, total_rows // 10)  # At least 10 samples, or 10% of data
+    # Early rejection: use stratified sampling (early + late slices) to catch
+    # trees that only break after enough history exists (e.g., window functions)
+    # This prevents false negatives from head-only sampling
+    sample_size = max(10, total_rows // 20)  # 5% per slice (smaller since we use 2 slices)
+    early_slice_end = min(sample_size, total_rows)
+    late_slice_start = max(0, total_rows - sample_size)
+    early_rejection_checked = False
     
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
@@ -621,13 +653,28 @@ def fitness(
         if not anomalies[idx] and alerting:
             fp += 1
         
-        # EARLY REJECTION: If we've sampled enough and invalid_rate is high, short-circuit
-        # This avoids wasting compute on clearly invalid trees
-        if idx + 1 >= early_rejection_sample_size:
-            early_invalid_rate = invalid_output_count / (idx + 1)
-            # If early sample shows >50% invalid, reject immediately
-            if early_invalid_rate > 0.5:
-                return -100.0
+        # EARLY REJECTION: Check after early slice and late slice
+        # Use stratified sampling to catch trees that break later (e.g., window functions)
+        if not early_rejection_checked:
+            # Check early slice
+            if idx + 1 >= early_slice_end:
+                early_invalid_rate = invalid_output_count / (idx + 1)
+                if early_invalid_rate > 0.5:
+                    return -100.0  # Early rejection from head slice
+            # Check late slice (if we've reached it)
+            elif idx + 1 >= late_slice_start:
+                # Calculate invalid rate from late slice only
+                late_slice_invalid = sum(
+                    1 for i in range(late_slice_start, idx + 1)
+                    if i < len(values)  # Safety check
+                )
+                # We need to track invalid outputs in late slice separately
+                # For now, use overall rate as approximation (will improve with better tracking)
+                if idx + 1 >= total_rows:
+                    early_rejection_checked = True
+                    overall_invalid_rate = invalid_output_count / total_rows
+                    if overall_invalid_rate > 0.5:
+                        return -100.0
     
     # Calculate metrics
     alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0

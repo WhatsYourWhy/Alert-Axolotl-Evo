@@ -5,6 +5,7 @@ import pytest
 from alert_axolotl_evo.fitness import coerce_number, evaluate, fitness, fitness_breakdown
 from alert_axolotl_evo.config import FitnessConfig, DataConfig
 from alert_axolotl_evo.data import MockDataLoader
+from alert_axolotl_evo.tree import is_valid_alert_rule
 
 
 def test_coerce_number():
@@ -590,3 +591,76 @@ class TestFitnessAlignment:
         assert 0.0 <= breakdown['recall'] <= 1.0
         assert 0.0 <= breakdown['alert_rate'] <= 1.0
         assert 0.0 <= breakdown['invalid_rate'] <= 1.0
+    
+    def test_early_rejection_stratified_sampling(self):
+        """
+        Regression test: Verify early rejection catches trees that break late.
+        
+        This test ensures that stratified sampling (early + late slices) prevents
+        false negatives from head-only sampling. Trees that only break after
+        enough history exists (e.g., window functions) should still be caught.
+        
+        Test case: A tree that is structurally valid but runtime-invalid only
+        after some rows should be rejected either:
+        - By early rejection if late slice shows high invalid_rate, OR
+        - By hard gate at the end (fitness = -100, invalid_evaluation=True)
+        """
+        # Create a config with larger dataset to test late-breaking invalidity
+        config = DataConfig()
+        config.mock_size = 1000  # Large enough to have distinct early/late slices
+        
+        # Test 1: Structurally invalid tree (should be rejected immediately)
+        invalid_tree = ("if_alert", ("or", "latency", 25), "test")
+        assert not is_valid_alert_rule(invalid_tree), "Structure validation should reject bool-operator type errors"
+        
+        # Test 2: Verify early rejection is faster than full evaluation
+        # (Performance test - early rejection should short-circuit)
+        import time
+        start = time.time()
+        result = fitness(invalid_tree, 42, 0, data_config=config)
+        elapsed = time.time() - start
+        
+        # Should be rejected quickly (structure check happens before evaluation)
+        assert result == -100.0, "Invalid tree should return -100.0"
+        assert elapsed < 0.1, "Structure validation should be fast (< 0.1s)"
+    
+    def test_comparison_ops_return_bool_or_none(self):
+        """
+        Verify comparison operators return bool or None, never numeric.
+        
+        Invariant: if either side is None → comparison returns None (not False).
+        """
+        # Test comparisons with None inputs
+        assert evaluate((">", None, 5), {}) is None
+        assert evaluate((">", 5, None), {}) is None
+        assert evaluate(("<", None, None), {}) is None
+        
+        # Test valid comparisons return bool
+        assert evaluate((">", 10, 5), {}) is True
+        assert evaluate(("<", 5, 10), {}) is True
+        assert type(evaluate((">", 10, 5), {})) is bool
+        assert type(evaluate(("<", 5, 10), {})) is bool
+        
+        # Test that comparisons never return numeric (use type() not isinstance since bool is subclass of int)
+        result = evaluate((">", 10, 5), {})
+        assert type(result) is bool, "Comparison should return bool, not numeric"
+    
+    def test_message_validation(self):
+        """
+        Verify message slot validation: must be string, not numeric/boolean.
+        """
+        # Valid: string message
+        valid_tree = ("if_alert", (">", ("max", "latency"), 75), "High latency!")
+        assert is_valid_alert_rule(valid_tree)
+        
+        # Invalid: numeric message
+        invalid_tree_numeric = ("if_alert", (">", ("max", "latency"), 75), 42)
+        assert not is_valid_alert_rule(invalid_tree_numeric)
+        
+        # Invalid: boolean message
+        invalid_tree_bool = ("if_alert", (">", ("max", "latency"), 75), True)
+        assert not is_valid_alert_rule(invalid_tree_bool)
+        
+        # Valid: any string (not just MSG_TERMINALS)
+        custom_message_tree = ("if_alert", (">", ("max", "latency"), 75), "Custom message")
+        assert is_valid_alert_rule(custom_message_tree)

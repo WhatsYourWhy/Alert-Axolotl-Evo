@@ -230,9 +230,13 @@ def is_valid_alert_rule(tree: Any) -> bool:
     if not is_boolean_expression(condition_subtree, ARITIES):
         return False  # Condition is not a valid boolean expression
     
-    # Message must be a string terminal (preferably from MSG_TERMINALS)
+    # Message must be a string terminal
+    # Allow any string (not just MSG_TERMINALS) for flexibility, but must be string
+    # This prevents numeric/boolean messages from being used
     if not isinstance(message_terminal, str):
         return False
+    # Note: We allow any string, not just MSG_TERMINALS, to allow custom messages
+    # But it must be a string (not a number, bool, or other type)
     
     # Recursively validate children structure
     return is_valid_subtree(tree, ARITIES)

@@ -115,9 +115,9 @@ Must not run competing learning systems in parallel.
   - Prevents unbounded tree growth.
   - Enforced in `fitness()` function.
 - **Explicit penalties for always-true / never-alert**: Degenerate solutions must be penalized.
-  - Always-true: Heavy penalty scaling with dataset size (lines 593-599).
-  - Never-alert: Explicit -5.0 penalty (line 570).
-  - Self-comparison: -10.0 penalty (line 566).
+  - Always-true: Heavy penalty scaling with dataset size (lines 761-767).
+  - Never-alert: Explicit -5.0 penalty (line 738).
+  - Self-comparison: -10.0 penalty (line 734).
 - **Baseline comparison must run and validate**: `print_fitness_comparison()` must be called.
   - Automatically called during evolution.
   - Can be called manually for validation.

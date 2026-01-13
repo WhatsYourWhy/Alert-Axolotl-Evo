@@ -58,7 +58,7 @@ Alert-Axolotl-Evo is built in five distinct layers:
 2. **Program Synthesis** – output form (tree representation)
 3. **Constraint-Guided Search** – semantic validity (`is_valid_alert_rule()`, type checking)
 4. **Economically Regulated Learning** – macro library, budgets (`promotion.py`)
-5. **Metric-Aligned Fitness Shaping** ← *This phase* (`fitness.py` lines 540-669)
+5. **Metric-Aligned Fitness Shaping** ← *This phase* (`fitness.py` lines 708-837)
 
 The fifth layer is rare. Most systems stop at layer 1-2. This system explicitly implements all five, with fitness alignment as the final layer that ensures operational relevance.
 
@@ -116,7 +116,7 @@ if precision < 0.3:
     score -= 5.0 * precision_deficit  # Max penalty of 1.5 for 0% precision
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 616-627
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 784-795
 
 **Why 30%?**: This threshold represents a reasonable balance for human-paged alerts. Below this, the operational cost of false alarms exceeds the value of detection.
 
@@ -130,7 +130,7 @@ if fpr > 0.15:  # More than 15% false positive rate
     score -= 2.0 * (fpr - 0.15)  # Penalty scales with excess FPR
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 643-645
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 811-813
 
 **Why 15%?**: This represents the maximum acceptable false positive rate for operational monitoring. Beyond this, alert fatigue sets in and operators start ignoring alerts.
 
@@ -150,7 +150,7 @@ elif alert_rate > 0.20:  # More than 20% but <= 50%
     score -= 3.0  # Penalty for too-high alert rate
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 591-601
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 755-769
 
 **Why these thresholds?**:
 - **0.2% floor**: Rules that alert less than this are effectively never-firing (deployment useless)
@@ -167,7 +167,7 @@ if recall < 0.1 and tp == 0:  # No detection at all
     score -= 3.0  # Additional penalty for zero detection
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 662-664
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 828-832
 
 **Why 10%?**: This ensures rules have minimum useful detection. Rules with zero true positives are explicitly penalized.
 
@@ -189,7 +189,7 @@ if tp == 0 and fp == 0:
     score -= 5.0  # Explicit penalty that dominates bloat incentives
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 561-570
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 729-738
 
 **Why this matters**: Without these penalties, the system can collapse into degenerate solutions that game the metrics without providing value.
 
@@ -208,7 +208,7 @@ if invalid_rate > 0.0:
     score -= 0.5 * invalid_rate
 ```
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 515-524
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 683-692
 
 **Why this matters**: Invalid outputs indicate semantic errors in the evolved logic. These must be caught and penalized.
 
@@ -386,12 +386,12 @@ But the fundamental issue (mock data artifacts) remains until the generator is i
 
 The alignment mechanisms are organized in [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py):
 
-1. **Lines 515-524**: Hard validity gates and invalid output detection
-2. **Lines 561-570**: Degenerate collapse prevention (self-comparison, no-alert)
-3. **Lines 591-601**: Alert-rate band penalties
-4. **Lines 616-627**: Precision pressure
-5. **Lines 643-645**: FPR penalties
-6. **Lines 662-664**: Recall floors
+1. **Lines 683-692**: Hard validity gates and invalid output detection
+2. **Lines 729-738**: Degenerate collapse prevention (self-comparison, no-alert)
+3. **Lines 755-769**: Alert-rate band penalties
+4. **Lines 784-795**: Precision pressure
+5. **Lines 811-813**: FPR penalties
+6. **Lines 828-832**: Recall floors
 
 ### Function Organization
 
@@ -417,7 +417,7 @@ This function compares the evolved champion against three baselines:
 2. **Always-True**: Rule that always alerts (`if_alert(True, ...)`)
 3. **Random Baseline**: Simple threshold rule (`avg(latency) > 50`)
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 709-790
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 877-1022
 
 ### Validation Logic
 
@@ -563,8 +563,8 @@ Each threshold exists for a specific operational reason. This section explains t
 ### For Developers (Implementation Details)
 
 **Code locations**: All alignment mechanisms are in [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py):
-- Lines 472-525: All alignment penalties
-- Lines 565-623: Baseline verification
+- Lines 708-837: All alignment penalties
+- Lines 840-1022: Baseline verification
 
 **How to add new alignment mechanisms**:
 1. Identify the operational constraint

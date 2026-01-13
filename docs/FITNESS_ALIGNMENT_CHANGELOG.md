@@ -45,7 +45,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Degenerate solutions eliminated, but precision issues remained.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 472-481
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 433-438
 
 ---
 
@@ -62,7 +62,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Rules became more deployment-feasible, but precision was still unconstrained.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 591-601
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 755-769
 
 ---
 
@@ -78,7 +78,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Rules started meeting operational precision requirements.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 616-627
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 784-795
 
 ---
 
@@ -94,7 +94,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Complete operational constraint coverage for false positives.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 643-645
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 811-813
 
 ---
 
@@ -109,7 +109,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Balanced alignment across all operational dimensions.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 662-664
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 828-832
 
 ---
 
@@ -125,7 +125,7 @@ This document tracks changes to fitness alignment mechanisms over time, document
 
 **Result**: Semantic errors caught and penalized.
 
-**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 447-456
+**Code Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 440-445
 
 ---
 
@@ -185,7 +185,7 @@ No baseline verification.
 
 `print_fitness_comparison()` function validates alignment by comparing champions against baselines.
 
-**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 565-623
+**Location**: [`alert_axolotl_evo/fitness.py`](alert_axolotl_evo/fitness.py) lines 840-1022
 
 ---
 

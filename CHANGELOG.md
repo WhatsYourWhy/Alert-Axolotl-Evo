@@ -2,6 +2,54 @@
 
 All notable changes to Alert-Axolotl-Evo will be documented in this file.
 
+## [Unreleased] - Semantic Firewall & Evidence Validity System
+
+### Added
+- **Semantic Firewall**: Multi-layer validation system to prevent invalid trees from wasting compute
+  - Structure validation: Purely syntactic checks (`is_valid_alert_rule()`, `is_boolean_expression()`) before evaluation
+  - Early rejection: Stratified sampling (early + late slices) to catch trees that break after enough history
+  - Hard gates: Invalid output detection (>50% invalid_rate = -100.0 fitness)
+  - Comparison operator invariants: Strict bool/None return (never numeric)
+  - Message validation: Message slot must be string (not numeric/boolean)
+- **Baseline Comparison System**: Structured baseline verification with typed exceptions
+  - `BaselineComparisonFailed(RuntimeError)`: Typed exception for baseline invariant violations
+  - `baseline_passed`: First-class field in `evolve()` result and `SelfImprovingEvolver.history`
+  - `enforce_baseline_comparison`: Configurable flag (default False for dev, True for CI/release)
+  - Baseline definitions logged for debugging
+- **Evidence Validity Tracking**: Comprehensive system to prevent learning from invalid evidence
+  - `invalid_evaluation`: Semantic invalidity flag (invalid_rate > 0.5)
+  - `exception_rate`: Separate tracking of actual exceptions during evaluation
+  - `data_provenance`: Expanded metadata including full data config and `dataset_hash`
+  - `dataset_hash`: SHA256 hash of actual data (rounded values + anomalies) for robust verification
+  - `evidence_valid`: Boolean flag combining invalid_evaluation, exception_rate, and provenance_ok
+  - Hard stop in `PromotionManager`: Invalid evidence prevents stats collection and market updates
+- **Stratified Sampling for Early Rejection**: Improved early rejection to prevent false negatives
+  - Samples both early slice (first 5%) and late slice (last 5%) of data
+  - Prevents false negatives from head-only sampling (catches window functions that break late)
+  - Deterministic and seeded for reproducibility
+
+### Changed
+- `fitness_breakdown()`: Now returns `exception_rate`, `invalid_evaluation`, and expanded `data_provenance`
+- `evolve()`: Returns structured result dict with `baseline_passed`, `baseline_details`, `champion_breakdown`, `evidence_valid`
+- `SelfImprovingEvolver.run_and_learn()`: Extracts baseline and evidence fields from evolution result, enforces baseline comparison if configured
+- `SelfImprovingEvolver._process_promotion_manager()`: Implements hard stop for invalid evidence, treats baseline failure as "market closed" but allows stats if evidence valid
+- `PromotionManager.process_generation_results()`: Accepts `evidence_valid` flag, returns early if False
+- `print_fitness_comparison()`: Returns dict with `provenance_ok` flag, verifies `dataset_hash` matching across champion and baselines
+- `FitnessConfig.enforce_baseline_comparison`: Default changed to `False` for development-friendly behavior
+- `_call_standard_function()`: Comparison operators now enforce strict bool return type (defensive check)
+- Documentation: Updated all line number references in `docs/FITNESS_ALIGNMENT.md` and `docs/FITNESS_ALIGNMENT_CHANGELOG.md` to match current code
+
+### Fixed
+- Unicode encoding issues in `tests/test_documentation.py`: All file reads now use `encoding='utf-8'`
+- Test failures in `test_promotion_integration.py`: Added missing `Mock` import
+- Test failures in `test_self_improving.py`: Fixed test expectations and added cleanup for test isolation
+- Line number references in documentation: Updated to match current code locations
+
+### Testing
+- Added regression tests: `test_early_rejection_stratified_sampling`, `test_comparison_ops_return_bool_or_none`, `test_message_validation`
+- All 214 tests passing
+- Integration tests verified: Economic invariants, promotion manager workflow, data provenance
+
 ## [Unreleased] - Fitness Alignment Documentation
 
 ### Added

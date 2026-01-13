@@ -1,0 +1,59 @@
+{
+  "tree": [
+    "if_alert",
+    [
+      "or",
+      "latency",
+      25
+    ],
+    "High alert!"
+  ],
+  "fitness": -100.0,
+  "generation": 2,
+  "metadata": {
+    "hash": "757e8d",
+    "node_count": 5,
+    "created_at": "2026-01-12T19:53:28.758759",
+    "seed": 42,
+    "config": {
+      "evolution": {
+        "seed": 42,
+        "pop_size": 10,
+        "generations": 3,
+        "min_depth": 2,
+        "max_depth": 7,
+        "elite_ratio": 0.1
+      },
+      "operators": {
+        "crossover_rate": 0.9,
+        "mutation_rate": 0.2,
+        "tournament_size": 4
+      },
+      "fitness": {
+        "beta": 0.5,
+        "bloat_penalty": 0.005,
+        "fp_threshold": 40,
+        "fp_penalty": 5.0,
+        "enforce_baseline_comparison": false
+      },
+      "fitness_alignment": {
+        "min_precision": 0.3,
+        "max_fpr": 0.15,
+        "min_alert_rate": 0.002,
+        "max_alert_rate": 0.2,
+        "always_true_threshold": 0.5,
+        "min_recall": 0.1
+      },
+      "data": {
+        "data_source": "mock",
+        "data_path": null,
+        "value_column": "value",
+        "timestamp_column": "timestamp",
+        "anomaly_column": null,
+        "mock_size": 1000,
+        "anomaly_count": 50,
+        "anomaly_multiplier": 1.8
+      }
+    }
+  }
+}

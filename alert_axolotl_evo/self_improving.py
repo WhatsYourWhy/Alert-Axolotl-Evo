@@ -259,30 +259,38 @@ class SelfImprovingEvolver:
                 return
             
             # EVIDENCE VALIDITY CHECK: Only collect stats if evidence is valid
-            # "Market closed" (baseline failed) but "data still valid" (evidence_valid=True)
-            # means we can collect stats but not promote/prune
-            market_closed = (baseline_passed is False)
-            can_collect_stats = evidence_valid
-            
-            if can_collect_stats:
-                # Stats collection is fine if breakdown is valid
-                # This happens even if baseline failed (market closed)
-                self.promotion_manager.process_generation_results(
-                    champions, 
-                    current_gen,
-                    evidence_valid=True,  # Explicit flag
-                )
-            else:
-                # Invalid evidence: eval errors, hard gate failure, data mismatch
-                # Don't count toward pattern lift stats
+            # Invalid evidence is a HARD STOP - no stats, no market
+            if not evidence_valid:
+                # Log detailed reason
+                evolution_result = self._get_latest_evolution_result()
+                bd = evolution_result.get('champion_breakdown', {}) if evolution_result else {}
+                baseline_details = evolution_result.get('baseline_details', {}) if evolution_result else {}
+                
+                invalid_rate = bd.get('invalid_rate', 0.0)
+                exception_rate = bd.get('exception_rate', 0.0)
+                invalid_eval = bd.get('invalid_evaluation', False)
+                provenance_ok = baseline_details.get('provenance_ok', False)
+                
                 logger.warning(
-                    f"SKIP stats collection: evidence invalid "
-                    f"(eval_error or invalid_rate > 0.5 or data mismatch). "
-                    f"Run {current_gen} marked as invalid evidence."
+                    f"SKIP stats collection: evidence invalid (HARD STOP). "
+                    f"invalid_rate={invalid_rate:.3f}, exception_rate={exception_rate:.3f}, "
+                    f"invalid_evaluation={invalid_eval}, provenance_ok={provenance_ok}. "
+                    f"Run {current_gen} marked as invalid evidence - no stats, no market."
                 )
                 # Still increment tick (time progresses)
                 self.economy_tick += 1
-                return
+                return  # HARD STOP - don't proceed to stats collection
+            
+            # If we get here, evidence is valid
+            # Now check baseline status (orthogonal to evidence validity)
+            market_closed = (baseline_passed is False)
+            
+            # Stats collection allowed (evidence is valid)
+            self.promotion_manager.process_generation_results(
+                champions, 
+                current_gen,
+                evidence_valid=True,  # Explicit flag
+            )
             
             # Warmup guard: only promote/prune after warmup period
             if self.economy_tick < self.promo_warmup_ticks:

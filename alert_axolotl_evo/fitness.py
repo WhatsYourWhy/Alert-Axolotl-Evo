@@ -18,6 +18,8 @@ Key Alignment Mechanisms:
 See docs/FITNESS_ALIGNMENT.md for comprehensive documentation.
 """
 
+import hashlib
+import json
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -305,14 +307,20 @@ def fitness_breakdown(
     
     tp = fp = fn = 0
     invalid_output_count = 0
+    exception_count = 0  # Track actual exceptions during evaluation
     for idx, value in enumerate(values):
         window_size = 5 + (idx % 2)
         start = max(0, idx - window_size + 1)
         window = values[start : idx + 1]
         data = {"latency": window}
         
-        # evaluate() already catches exceptions and returns None, so we don't need try/except here
-        result = evaluate(tree, data)
+        # Track actual exceptions (even though evaluate() catches them)
+        try:
+            result = evaluate(tree, data)
+        except Exception:
+            # Actual exception occurred during evaluation
+            exception_count += 1
+            result = None
         
         # HARD VALIDITY GATE: Check output validity
         # Valid output is str (alert message) or None (no alert)
@@ -342,11 +350,11 @@ def fitness_breakdown(
     total_rows = len(values)
     alert_rate = (tp + fp) / total_rows if total_rows > 0 else 0.0
     invalid_rate = invalid_output_count / total_rows if total_rows > 0 else 0.0
+    exception_rate = exception_count / total_rows if total_rows > 0 else 0.0
     
-    # Set eval_error flag: hard gate failure (invalid_rate > 0.5) indicates evaluation problems
-    # Since evaluate() already catches exceptions and returns None, we use invalid_rate as proxy
-    # for evaluation issues (invalid outputs, type errors, etc.)
-    eval_error_occurred = invalid_rate > 0.5
+    # Semantic invalidity: invalid outputs (type errors, semantic errors)
+    # This is separate from actual exceptions thrown by the engine
+    invalid_evaluation = invalid_rate > 0.5
     
     # Calculate possible_tp from actual anomalies in data
     possible_tp = sum(anomalies) if anomalies else data_config.anomaly_count
@@ -406,6 +414,46 @@ def fitness_breakdown(
     # Determine consistent_data flag for provenance
     consistent_data = getattr(data_config, 'consistent_data', True)
     
+    # Compute dataset hash from actual data (ensures same dataset)
+    # Round values to avoid floating point precision issues
+    values_rounded = [round(v, 6) for v in values]
+    dataset_content = {
+        "values": values_rounded,
+        "anomalies": anomalies,
+    }
+    dataset_json = json.dumps(dataset_content, sort_keys=True)
+    dataset_hash = hashlib.sha256(dataset_json.encode()).hexdigest()[:16]  # Short SHA
+    
+    # Build comprehensive provenance
+    data_provenance = {
+        "seed": seed,
+        "gen": gen,
+        "consistent_data": consistent_data,
+        "data_loader_type": type(data_loader).__name__ if data_loader else "mock",
+        # Full data config that affects dataset
+        "mock_size": data_config.mock_size,
+        "anomaly_count": data_config.anomaly_count,
+        "anomaly_multiplier": data_config.anomaly_multiplier,
+        # If MockDataLoader, include its parameters
+        "use_realistic_patterns": getattr(data_loader, 'use_realistic_patterns', None) if data_loader else None,
+        "base_latency_mean": getattr(data_loader, 'base_latency_mean', None) if data_loader else None,
+        "base_latency_std": getattr(data_loader, 'base_latency_std', None) if data_loader else None,
+        "trend_strength": getattr(data_loader, 'trend_strength', None) if data_loader else None,
+        "noise_level": getattr(data_loader, 'noise_level', None) if data_loader else None,
+        # For CSV/JSON data
+        "data_path": str(data_config.data_path) if data_config.data_path else None,
+        "data_source": data_config.data_source,
+        # Dataset hash (computed from actual data)
+        "dataset_hash": dataset_hash,
+    }
+    
+    # If external data file, add file metadata
+    if data_config.data_path and data_config.data_path.exists():
+        import os
+        stat = data_config.data_path.stat()
+        data_provenance["file_mtime"] = stat.st_mtime
+        data_provenance["file_size"] = stat.st_size
+    
     return {
         "fitness": final_fitness,
         "tp": tp,
@@ -425,13 +473,9 @@ def fitness_breakdown(
         "alert_rate": alert_rate,
         "invalid_rate": invalid_rate,
         "node_count": node_count(tree),
-        "eval_error": eval_error_occurred,
-        "data_provenance": {
-            "seed": seed,
-            "gen": gen,
-            "consistent_data": consistent_data,
-            "data_loader_type": type(data_loader).__name__ if data_loader else "mock",
-        },
+        "exception_rate": exception_rate,  # Actual exceptions during eval
+        "invalid_evaluation": invalid_evaluation,  # Semantic invalidity (invalid_rate > 0.5)
+        "data_provenance": data_provenance,
     }
 
 
@@ -817,6 +861,26 @@ def print_fitness_comparison(
     threshold = 50.0  # Default threshold for random baseline
     random_baseline = baseline_random(seed, gen, fitness_config, data_config, data_loader, threshold=threshold)
     
+    # CRITICAL: Verify all baselines use same dataset (same dataset_hash)
+    champion_hash = champion_breakdown.get('data_provenance', {}).get('dataset_hash')
+    baseline_hashes = [
+        always_false.get('data_provenance', {}).get('dataset_hash'),
+        always_true.get('data_provenance', {}).get('dataset_hash'),
+        random_baseline.get('data_provenance', {}).get('dataset_hash'),
+    ]
+    
+    # If any baseline has different dataset hash, evidence is invalid
+    provenance_ok = (
+        champion_hash is not None and
+        all(h == champion_hash for h in baseline_hashes if h is not None)
+    )
+    
+    if not provenance_ok:
+        print(f"\nWARNING: Dataset hash mismatch between champion and baselines!")
+        print(f"  Champion hash: {champion_hash}")
+        print(f"  Baseline hashes: {baseline_hashes}")
+        print(f"  This indicates data mismatch - evidence is invalid.")
+    
     print(f"\nBASELINES:")
     print(f"  Always-False: Fitness={always_false['fitness']:.3f}, TP={always_false['tp']}, FP={always_false['fp']}, FN={always_false['fn']}")
     print(f"  Always-True:  Fitness={always_true['fitness']:.3f}, TP={always_true['tp']}, FP={always_true['fp']}, FN={always_true['fn']}")
@@ -866,6 +930,7 @@ def print_fitness_comparison(
                 'threshold': threshold,
             },
         },
+        'provenance_ok': provenance_ok,  # Dataset hash match verification
     }
     
     return comparison_result

@@ -240,20 +240,14 @@ def evolve(
         )
         
         # Check evidence validity: breakdown must be computed on same dataset
-        # and not hit hard gates (invalid_rate > 0.5, eval errors, etc.)
+        # and not hit hard gates (invalid_rate > 0.5, exceptions, etc.)
         invalid_rate = champion_breakdown.get('invalid_rate', 0.0)
-        has_hard_gate_failure = invalid_rate > 0.5
-        has_eval_errors = champion_breakdown.get('eval_error', False)
+        exception_rate = champion_breakdown.get('exception_rate', 0.0)
+        invalid_evaluation = champion_breakdown.get('invalid_evaluation', False)
         
-        # Evidence is valid if:
-        # 1. Breakdown computed successfully
-        # 2. No hard gate failure (invalid_rate <= 0.5)
-        # 3. No eval errors
-        evidence_valid = (
-            champion_breakdown is not None and
-            not has_hard_gate_failure and
-            not has_eval_errors
-        )
+        # Provenance check will be done in baseline comparison
+        # For now, just check that breakdown exists
+        breakdown_exists = champion_breakdown is not None
         
         baseline_comparison = print_fitness_comparison(
             champion,
@@ -265,6 +259,21 @@ def evolve(
             data_loader,
         )
         
+        # Check provenance match from baseline comparison
+        provenance_ok = baseline_comparison.get('provenance_ok', False)
+        
+        # Evidence is valid if:
+        # 1. Breakdown computed successfully
+        # 2. No semantic invalidity (invalid_rate <= 0.5)
+        # 3. No exceptions during evaluation (exception_rate == 0)
+        # 4. Provenance matches between champion and baselines
+        evidence_valid = (
+            breakdown_exists and
+            not invalid_evaluation and  # invalid_rate <= 0.5
+            exception_rate == 0.0 and  # No actual exceptions
+            provenance_ok  # Dataset hash match
+        )
+        
         # Log baseline definitions for debugging
         logger = logging.getLogger("evo")
         logger.info("Baseline definitions:")
@@ -273,6 +282,7 @@ def evolve(
         
         result['baseline_passed'] = baseline_comparison['baseline_passed']
         result['baseline_details'] = baseline_comparison
+        result['evidence_valid'] = evidence_valid
         
     except Exception as e:
         logging.getLogger("evo").warning(f"Failed to compute fitness breakdown: {e}")

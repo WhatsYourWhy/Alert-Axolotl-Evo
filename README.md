@@ -14,6 +14,13 @@ Alert-Axolotl-Evo implements a **symbolic evolutionary economics** approach to p
 
 The system is designed for anomaly detection in time-series data, but the architecture supports any domain where symbolic rule evolution is valuable.
 
+1. Load data (and labels/auto-label).
+2. Generate initial population within depth limits.
+3. Evaluate fitness with alignment penalties.
+4. Select + mutate/crossover.
+5. Track champions + checkpoint.
+6. Optional: PromotionManager/Compiler macro promotion with budget enforcement.
+
 ## Determinism Contract
 
 - **Python versions tested**: 3.8–3.11.

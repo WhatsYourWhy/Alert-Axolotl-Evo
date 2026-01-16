@@ -145,6 +145,29 @@ python -m alert_axolotl_evo.main \
 python -m alert_axolotl_evo.main --performance-report
 ```
 
+## Data Schema
+
+When supplying CSV/JSON data via `--data-source` and `--data-path`, the dataset should include the following:
+
+**Required fields**
+- `timestamp`: time value (e.g., ISO 8601 string or epoch).
+- One or more value columns (e.g., `latency`, `cpu`).
+- Optional label/anomaly column if you have ground truth (e.g., `is_anomaly`).
+
+**Optional fields**
+- Entity identifiers (e.g., `host_id`, `service`).
+- Grouping keys for segmented analysis (e.g., `region`, `tier`).
+
+**Multivariate input**
+- Provide multiple value columns (wide format), or a single `features`/`metrics` column containing a feature dictionary (JSON) per row.
+
+**Tiny CSV example**
+```csv
+timestamp,latency,cpu,is_anomaly,host_id,region
+2024-01-01T00:00:00Z,120.5,0.82,0,web-01,us-east
+2024-01-01T00:01:00Z,300.0,0.95,1,web-01,us-east
+```
+
 ## Configuration
 
 ### Configuration File (YAML)

@@ -14,6 +14,13 @@ Alert-Axolotl-Evo implements a **symbolic evolutionary economics** approach to p
 
 The system is designed for anomaly detection in time-series data, but the architecture supports any domain where symbolic rule evolution is valuable.
 
+## Determinism Contract
+
+- **Python versions tested**: 3.8–3.11.
+- **RNG sources**: Python's `random` module (seeded `random.Random` instances plus global seed). NumPy is optional and used only for deterministic percentile calculations during CSV auto-labeling (no RNG use). Tree visualization uses deterministic hashing to seed local RNGs.
+- **Execution model**: Determinism assumes single-threaded execution and fixed evaluation ordering (no parallel evaluation or nondeterministic iteration sources).
+- **Determinism statement**: Deterministic given the same Python version, dependencies, and single-threaded evaluation. Seed selection is controlled via `evolution.seed` in `config.yaml` or the `--seed` CLI flag.
+
 ## Documentation
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design documentation

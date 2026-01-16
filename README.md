@@ -170,6 +170,12 @@ timestamp,latency,cpu,is_anomaly,host_id,region
 
 ## Configuration
 
+### Complexity & Performance Notes
+
+- **Default depth limits**: `evolution.max_depth` defaults to `7` (with `evolution.min_depth` default `2`). There is no explicit `evolution.max_nodes` cap in the config; tree size is instead controlled by depth limits plus the bloat penalty described below.
+- **Bloat penalty**: `fitness.bloat_penalty` applies a linear penalty per node (fitness is reduced by `bloat_penalty * node_count`), so larger trees get proportionally lower scores.
+- **Window function cost & safeguards**: `window_avg`, `window_max`, and `window_min` are more computationally expensive because they scan a rolling window per row. The fitness evaluator uses stratified sampling (early + late slices) to catch window-related invalid outputs early and rejects rules with excessive invalid outputs, reducing wasted work on expensive-but-invalid windowed trees.
+
 ### Configuration File (YAML)
 
 Create a `config.yaml` file:

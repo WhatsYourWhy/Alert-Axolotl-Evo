@@ -234,7 +234,8 @@ All configuration parameters can be overridden via CLI:
 - `sum`: Sum
 - `count`: Count
 - `stddev`: Standard deviation
-- `percentile`: Percentile (takes percentile as second argument)
+- `percentile`: Percentile (takes percentile as second argument; valid range is 0–100, not 0–1; uses default implementation with no interpolation)
+- Example expression: `('>', ('percentile', 'latency', 95), 120)`
 
 ### Time-Window Functions
 - `window_avg`: Rolling average

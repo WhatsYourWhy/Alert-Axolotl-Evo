@@ -243,6 +243,9 @@ All configuration parameters can be overridden via CLI:
 - Numeric values: `25`, `50`, `75`, `100`, `150`, `200`
 - Alert messages: `"High alert!"`, `"Danger zone!"`, etc.
 
+### Rule Semantics
+Comparisons only operate on numeric values; if either side is missing or non-numeric, the comparison returns `None` (not `False`). Logical operators do **not** use three-valued logic: `and`/`or` require boolean inputs, and `not` requires a boolean input—any `None` (or non-boolean) input makes the operator return `None` and short-circuits alerting. There is no default coercion for missing values; invalid semantics propagate `None` up the tree (e.g., `("and", (">", "latency", 100), (">", "missing_metric", 5))` ⇒ `None` because `"missing_metric"` is absent). 
+
 ## Examples
 
 ### Basic Evolution

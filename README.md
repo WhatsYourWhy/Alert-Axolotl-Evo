@@ -300,11 +300,13 @@ report = evolver.get_performance_report()
 
 **Economic Learning Features:**
 - **PromotionManager**: Enforces economic constraints on pattern promotion
-  - Patterns must show causal lift (not just correlation)
+  - Patterns must show incremental contribution (not just correlation)
   - Hard budget limits with eviction rules
   - Evidence-based promotion and pruning
 - **Monotonic Economic Time**: `economy_tick` ensures correct pattern aging
 - **Market Status Reports**: Inspect active library, promotions, and candidates
+
+Incremental contribution is estimated via presence/absence statistics across champion batches (a complement method), not by ablating a macro from an otherwise identical individual. Promotions require a shrunken lift of at least 1.02 with 20+ observations, and market actions are gated by min-promo batch size and warmup ticks. Evidence validity checks can halt stats collection, and baseline failures close the market for that tick; stabilization is handled through shrinkage and minimum-evidence thresholds for pruning rather than explicit holdouts or slices.
 
 See `docs/design_contract.md` for the complete economic architecture.
 

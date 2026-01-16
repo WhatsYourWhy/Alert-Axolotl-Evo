@@ -49,6 +49,8 @@ The system is designed for anomaly detection in time-series data, but the archit
   - Precision pressure (≥30% for human-paged alerts)
   - FPR penalties (≤15% operational noise tolerance)
   - Alert-rate bands (0.2%-20% deployment feasibility)
+    - Defined per fitness evaluation pass over the dataset: `(TP+FP) / total evaluated rows` for a candidate rule. This is not per tick/window unless each row represents a tick/window in your dataset.
+    - Config keys: `fitness_alignment.min_alert_rate` (default `0.002`) and `fitness_alignment.max_alert_rate` (default `0.20`).
   - Recall floors (≥10% minimum usefulness)
   - Degenerate collapse prevention (always-true/always-false elimination)
 - **Evolutionary Economics**: PromotionManager enforces economic constraints on self-extension

@@ -72,6 +72,8 @@ The system is designed for anomaly detection in time-series data, but the archit
 
 ## Installation
 
+This repo is not open source; internal evaluation only unless licensed. No redistribution.
+
 ### Basic Installation
 
 ```bash

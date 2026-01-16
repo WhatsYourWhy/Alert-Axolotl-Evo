@@ -59,7 +59,7 @@ The system is designed for anomaly detection in time-series data, but the archit
 - **Fitness-based selection**: F-beta scoring with operational alignment constraints
 - **Extensible architecture**: Easy to add new primitives and operators
 - **Comprehensive configuration**: YAML/JSON config files with CLI overrides
-- **Production-ready**: Export evolved rules for deployment with operational guarantees
+- **Deployment-oriented**: Export evolved rules for integration into monitoring pipelines
 
 ## Installation
 

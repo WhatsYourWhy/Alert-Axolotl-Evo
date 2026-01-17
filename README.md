@@ -23,7 +23,7 @@ The system is designed for anomaly detection in time-series data, but the archit
 
 ## Determinism Contract
 
-- **Python versions tested**: 3.8–3.11.
+- **Python versions**: 3.8+ (see `pyproject.toml` for supported classifiers).
 - **RNG sources**: Python's `random` module (seeded `random.Random` instances plus global seed). NumPy is optional and used only for deterministic percentile calculations during CSV auto-labeling (no RNG use). Tree visualization uses deterministic hashing to seed local RNGs.
 - **Execution model**: Determinism assumes single-threaded execution and fixed evaluation ordering (no parallel evaluation or nondeterministic iteration sources).
 - **Determinism statement**: Deterministic given the same Python version, dependencies, and single-threaded evaluation. Seed selection is controlled via `evolution.seed` in `config.yaml` or the `--seed` CLI flag.
@@ -45,7 +45,7 @@ The system is designed for anomaly detection in time-series data, but the archit
 ### Core Capabilities
 
 - **Symbolic Rule Evolution**: Evolves explicit logic trees (not neural networks) for full interpretability
-- **Production-Grade Fitness Alignment**: Metric-aligned semantic program synthesis ensures fitness scores correspond to operational value
+- **Fitness Alignment**: Metric-aligned semantic program synthesis ties fitness scores to operational constraints
   - Precision pressure (≥30% for human-paged alerts)
   - FPR penalties (≤15% operational noise tolerance)
   - Alert-rate bands (0.2%-20% deployment feasibility)
@@ -58,7 +58,7 @@ The system is designed for anomaly detection in time-series data, but the archit
   - Hard budget limits with eviction rules
   - Evidence-based promotion and pruning
 - **Deterministic Behavior**: Seeded evolution ensures reproducible results
-- **Real-World Data Support**: Load from CSV/JSON with optional auto-labeling
+- **Real-World Data Support**: Load from CSV or JSON (CSV supports optional auto-labeling when labels are missing)
 - **Self-Improving Mode**: System learns optimal configurations and discovers useful patterns
 - **Checkpoint & Persistence**: Save/load evolution state and evolved rules
 
@@ -151,25 +151,25 @@ python -m alert_axolotl_evo.main --performance-report
 
 ## Data Schema
 
-When supplying CSV/JSON data via `--data-source` and `--data-path`, the dataset should include the following:
+When supplying CSV/JSON data via `--data-source` and `--data-path`, the dataset should include a **single numeric value column** and an optional anomaly label column. Only one metric is used in rule evaluation.
 
 **Required fields**
-- `timestamp`: time value (e.g., ISO 8601 string or epoch).
-- One or more value columns (e.g., `latency`, `cpu`).
-- Optional label/anomaly column if you have ground truth (e.g., `is_anomaly`).
+- Value column (default `value`, configured via `--value-column`).
 
 **Optional fields**
-- Entity identifiers (e.g., `host_id`, `service`).
-- Grouping keys for segmented analysis (e.g., `region`, `tier`).
+- `timestamp` column (default `timestamp`, currently ignored by the loader but kept for schema compatibility).
+- Anomaly label column (configured via `--anomaly-column`). If omitted in CSV, the loader auto-labels anomalies using the 98th percentile threshold.
+- JSON inputs do not auto-label; missing anomaly keys are treated as non-anomalies.
 
-**Multivariate input**
-- Provide multiple value columns (wide format), or a single `features`/`metrics` column containing a feature dictionary (JSON) per row.
+**JSON formats supported**
+- Array of objects with per-row keys (e.g., `[{ "value": 1.2, "is_anomaly": false }, ...]`)
+- Object with arrays (e.g., `{ "value": [1.2, 3.4], "is_anomaly": [false, true] }`)
 
 **Tiny CSV example**
 ```csv
-timestamp,latency,cpu,is_anomaly,host_id,region
-2024-01-01T00:00:00Z,120.5,0.82,0,web-01,us-east
-2024-01-01T00:01:00Z,300.0,0.95,1,web-01,us-east
+timestamp,value,is_anomaly
+2024-01-01T00:00:00Z,120.5,0
+2024-01-01T00:01:00Z,300.0,1
 ```
 
 ## Configuration
@@ -212,8 +212,9 @@ data:
 
 ### CLI Arguments
 
-All configuration parameters can be overridden via CLI:
+The CLI exposes configuration overrides plus additional runtime flags:
 
+**Core evolution/config overrides**
 - `--seed`: Random seed
 - `--pop-size`: Population size
 - `--generations`: Number of generations
@@ -222,11 +223,31 @@ All configuration parameters can be overridden via CLI:
 - `--crossover-rate`: Crossover probability
 - `--mutation-rate`: Mutation probability
 - `--tournament-size`: Tournament selection size
+- `--data-source`: `mock`, `csv`, or `json`
+- `--data-path`: Path to CSV/JSON data file
+- `--value-column`: Column/key for numeric values (default `value`)
+- `--anomaly-column`: Column/key for anomaly labels (optional)
+
+**Run modes and outputs**
+- `--load-checkpoint`: Resume from a saved checkpoint
+- `--save-checkpoint`: Save checkpoints during evolution
+- `--export-rule`: Export the final champion rule
+- `--meta-evolve`: Run meta-evolution to search for better configs
+- `--meta-generations`: Meta-evolution generations
+- `--meta-pop-size`: Meta-evolution population size
+- `--self-improving`: Run self-improving mode
+- `--results-dir`: Directory for self-improving results
+- `--enable-promotion-manager`: Enable PromotionManager (economic learning)
+- `--library-budget`: Max active macros (PromotionManager)
+- `--min-promo-batch`: Min batch size for PromotionManager updates
+- `--promo-warmup-ticks`: Warmup ticks before promotions
+- `--performance-report`: Print a performance report from results
 
 ## Primitives
 
 ### Comparison Operators
-- `>`, `<`, `>=`, `<=`, `==`, `!=`
+- `>`, `<`, `>=`, `<=`
+- `==`, `!=` exist as primitives but are not part of the default boolean operator pool used for condition generation.
 
 ### Logical Operators
 - `and`, `or`, `not`
@@ -250,12 +271,12 @@ All configuration parameters can be overridden via CLI:
 - `if_alert`: Alert condition (if condition is true, return message)
 
 ### Terminals
-- `"latency"`: Variable reference
+- `"latency"`: Variable reference (represents the current rolling window of values, not a scalar)
 - Numeric values: `25`, `50`, `75`, `100`, `150`, `200`
 - Alert messages: `"High alert!"`, `"Danger zone!"`, etc.
 
 ### Rule Semantics
-Comparisons only operate on numeric values; if either side is missing or non-numeric, the comparison returns `None` (not `False`). Logical operators do **not** use three-valued logic: `and`/`or` require boolean inputs, and `not` requires a boolean input—any `None` (or non-boolean) input makes the operator return `None` and short-circuits alerting. There is no default coercion for missing values; invalid semantics propagate `None` up the tree (e.g., `("and", (">", "latency", 100), (">", "missing_metric", 5))` ⇒ `None` because `"missing_metric"` is absent). 
+Comparisons only operate on numeric values; if either side is missing or non-numeric, the comparison returns `None` (not `False`). Logical operators do **not** use three-valued logic: `and`/`or` require boolean inputs, and `not` requires a boolean input—any `None` (or non-boolean) input makes the operator return `None` and short-circuits alerting. There is no default coercion for missing values; invalid semantics propagate `None` up the tree. Note that `"latency"` resolves to a rolling window list, so comparisons should typically use `avg`, `percentile`, or a `window_*` function to produce numeric values before comparison.
 
 ## Examples
 
@@ -399,17 +420,23 @@ alert_axolotl_evo/
 └── main.py                # CLI entry point
 
 tests/
-├── test_tree.py
-├── test_fitness.py
-├── test_operators.py
-├── test_evolution.py
+├── test_analytics.py
+├── test_compiler.py
+├── test_csv_auto_labeling.py
 ├── test_data.py
 ├── test_data_provenance.py
-├── test_csv_auto_labeling.py
+├── test_documentation.py
 ├── test_economy_invariants.py
-├── test_analytics.py
+├── test_evolution.py
+├── test_fitness.py
 ├── test_meta_evolution.py
-└── test_self_improving.py
+├── test_operators.py
+├── test_pattern_discovery.py
+├── test_primitives.py
+├── test_promotion.py
+├── test_promotion_integration.py
+├── test_self_improving.py
+└── test_tree.py
 ```
 
 ## Testing
@@ -440,6 +467,7 @@ For detailed API documentation, see the inline docstrings in the source code. Ke
 
 - Python 3.8 or higher
 - Optional: PyYAML (for YAML config file support)
+- Optional: NumPy (for CSV auto-label percentile calculation; fallback implementation is used otherwise)
 
 ## Design Philosophy
 

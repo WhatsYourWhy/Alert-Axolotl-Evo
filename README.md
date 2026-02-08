@@ -72,8 +72,6 @@ The system is designed for anomaly detection in time-series data, but the archit
 
 ## Installation
 
-This repo is not open source; internal evaluation only unless licensed. No redistribution.
-
 ### Basic Installation
 
 ```bash
@@ -482,11 +480,7 @@ See [docs/design_contract.md](docs/design_contract.md) for the complete design c
 
 ## License
 
-**Proprietary - All Rights Reserved**
-
-Copyright (c) 2024 Alert Axolotl Evo
-
-This software is proprietary and confidential. Unauthorized use, reproduction, or distribution is prohibited. For licensing inquiries, please contact the copyright holder.
+MIT License — Copyright (c) 2026 Justin
 
 See [LICENSE](LICENSE) for full terms.
 

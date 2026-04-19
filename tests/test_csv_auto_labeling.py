@@ -51,14 +51,14 @@ def test_csv_auto_labeling():
         
         # Verify auto-labeling caught the spikes
         # With 95th percentile, spikes at 150, 145, 160 should be flagged
-        assert anomalies[10] is True, "Spike at index 10 should be labeled as anomaly"
-        assert anomalies[50] is True, "Spike at index 50 should be labeled as anomaly"
-        assert anomalies[90] is True, "Spike at index 90 should be labeled as anomaly"
-        
+        assert bool(anomalies[10]), "Spike at index 10 should be labeled as anomaly"
+        assert bool(anomalies[50]), "Spike at index 50 should be labeled as anomaly"
+        assert bool(anomalies[90]), "Spike at index 90 should be labeled as anomaly"
+
         # Verify some normal values are not flagged
         normal_indices = [0, 1, 2, 5, 20, 30, 40, 60, 70, 80]
         for idx in normal_indices:
-            assert anomalies[idx] is False, f"Normal value at index {idx} should not be flagged"
+            assert not bool(anomalies[idx]), f"Normal value at index {idx} should not be flagged"
         
         # Verify threshold is reasonable (should be around 100-110 for 95th percentile)
         # Count how many are flagged
@@ -92,9 +92,9 @@ def test_csv_with_existing_anomaly_column():
         
         # Should use existing column, not auto-label
         assert len(values) == 3
-        assert anomalies[0] is False
-        assert anomalies[1] is True
-        assert anomalies[2] is False
+        assert not bool(anomalies[0])
+        assert bool(anomalies[1])
+        assert not bool(anomalies[2])
         
     finally:
         csv_file.unlink()

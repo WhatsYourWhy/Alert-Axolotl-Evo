@@ -1,6 +1,5 @@
 """Tests for analytics module."""
 
-import json
 import tempfile
 from pathlib import Path
 

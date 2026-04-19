@@ -4,13 +4,11 @@ Economic Invariant Tests
 These tests ensure the Evolutionary Economics architecture cannot be regressed.
 If any of these fail, the economy is broken.
 """
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 
-from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.promotion import PromotionManager
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 
 
 class TestNoLeakInvariant:
@@ -216,7 +214,7 @@ class TestEvidenceFloorsInvariant:
         manager = PromotionManager(compiler, library_budget=10)
         
         # Create a variant with low evidence
-        from alert_axolotl_evo.promotion import PatternVariant, PatternStats
+        from alert_axolotl_evo.promotion import PatternStats, PatternVariant
         variant = PatternVariant(
             family_hash="test_fam",
             exact_hash="test_exact",
@@ -244,7 +242,7 @@ class TestEvidenceFloorsInvariant:
         compiler = Mock()
         manager = PromotionManager(compiler, library_budget=10)
         
-        from alert_axolotl_evo.promotion import PatternVariant, PatternStats
+        from alert_axolotl_evo.promotion import PatternStats, PatternVariant
         variant = PatternVariant(
             family_hash="test_fam",
             exact_hash="test_exact",
@@ -271,7 +269,7 @@ class TestEvidenceFloorsInvariant:
         compiler = Mock()
         manager = PromotionManager(compiler, library_budget=10)
         
-        from alert_axolotl_evo.promotion import PatternVariant, PatternStats
+        from alert_axolotl_evo.promotion import PatternStats, PatternVariant
         variant = PatternVariant(
             family_hash="test_fam",
             exact_hash="test_exact",
@@ -305,7 +303,7 @@ class TestBudgetEnforcementInvariant:
         manager = PromotionManager(compiler, library_budget=budget)
         
         # Try to add more than budget
-        from alert_axolotl_evo.promotion import PatternVariant, PatternStats
+        from alert_axolotl_evo.promotion import PatternStats, PatternVariant
         
         for i in range(budget + 3):  # Try to add 3 over budget
             variant = PatternVariant(
@@ -347,7 +345,7 @@ class TestBudgetEnforcementInvariant:
         budget = 2
         manager = PromotionManager(compiler, library_budget=budget)
         
-        from alert_axolotl_evo.promotion import PatternVariant, PatternStats
+        from alert_axolotl_evo.promotion import PatternStats, PatternVariant
         
         # Add two active patterns
         for i in range(2):

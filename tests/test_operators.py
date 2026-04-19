@@ -1,6 +1,5 @@
 """Tests for genetic operators."""
 
-import pytest
 
 from alert_axolotl_evo.operators import (
     initialize_population,

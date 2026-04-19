@@ -1,6 +1,5 @@
 """Tests for meta-evolution module."""
 
-import pytest
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.meta_evolution import ConfigGenome, MetaEvolver

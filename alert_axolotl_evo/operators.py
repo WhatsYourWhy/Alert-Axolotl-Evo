@@ -4,7 +4,13 @@ import random
 from typing import Any, List, Optional, Tuple
 
 from alert_axolotl_evo.primitives import ARITIES, BOOLEAN_FUNCTIONS, FUNCTION_NAMES, MSG_TERMINALS, TERMINALS
-from alert_axolotl_evo.tree import ensure_alert_root, get_subtree_paths, is_valid_subtree, node_count, replace_subtree
+from alert_axolotl_evo.tree import (
+    ensure_alert_root,
+    get_subtree_paths,
+    is_valid_subtree,
+    node_count,
+    replace_subtree,
+)
 
 
 def random_terminal(rng: Optional[random.Random] = None) -> Any:

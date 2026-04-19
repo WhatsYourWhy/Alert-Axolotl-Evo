@@ -4,10 +4,10 @@ Features: O(P) Stats Update, Statistical Shrinkage, Introspection Expansion.
 """
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Optional, Tuple
 
-from alert_axolotl_evo.tree import merkle_hash, node_count
 from alert_axolotl_evo.primitives import FUNCTIONS
+from alert_axolotl_evo.tree import merkle_hash, node_count
 
 
 @dataclass

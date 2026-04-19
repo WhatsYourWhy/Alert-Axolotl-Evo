@@ -4,8 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
-
 from alert_axolotl_evo.compiler import PrimitiveCompiler
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.fitness import evaluate

@@ -1,6 +1,5 @@
 """Tests for evolution loop."""
 
-import pytest
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.evolution import evolve, select_top_bottom

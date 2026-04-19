@@ -25,8 +25,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from alert_axolotl_evo.config import DataConfig, FitnessConfig
 from alert_axolotl_evo.data import DataLoader, MockDataLoader
-from alert_axolotl_evo.primitives import ALERT, FUNCTIONS, ARITIES
-from alert_axolotl_evo.tree import is_valid_alert_rule, node_count, is_self_comparison
+from alert_axolotl_evo.primitives import ALERT, ARITIES, FUNCTIONS
+from alert_axolotl_evo.tree import is_self_comparison, is_valid_alert_rule, node_count
 
 
 class BaselineComparisonFailed(RuntimeError):
@@ -501,7 +501,6 @@ def fitness_breakdown(
     
     # If external data file, add file metadata
     if data_config.data_path and data_config.data_path.exists():
-        import os
         stat = data_config.data_path.stat()
         data_provenance["file_mtime"] = stat.st_mtime
         data_provenance["file_size"] = stat.st_size
@@ -920,7 +919,7 @@ def print_fitness_comparison(
     print("=" * 70)
     
     # Champion
-    print(f"\nCHAMPION:")
+    print("\nCHAMPION:")
     print(f"  Tree: {champion_tree}")
     print(f"  Fitness: {champion_breakdown['fitness']:.3f}")
     print(f"  TP: {champion_breakdown['tp']}, FP: {champion_breakdown['fp']}, FN: {champion_breakdown['fn']}")
@@ -960,18 +959,18 @@ def print_fitness_comparison(
     )
     
     if not provenance_ok:
-        print(f"\nWARNING: Dataset hash mismatch between champion and baselines!")
+        print("\nWARNING: Dataset hash mismatch between champion and baselines!")
         print(f"  Champion hash: {champion_hash}")
         print(f"  Baseline hashes: {baseline_hashes}")
-        print(f"  This indicates data mismatch - evidence is invalid.")
+        print("  This indicates data mismatch - evidence is invalid.")
     
-    print(f"\nBASELINES:")
+    print("\nBASELINES:")
     print(f"  Always-False: Fitness={always_false['fitness']:.3f}, TP={always_false['tp']}, FP={always_false['fp']}, FN={always_false['fn']}")
     print(f"  Always-True:  Fitness={always_true['fitness']:.3f}, TP={always_true['tp']}, FP={always_true['fp']}, FN={always_true['fn']}")
     print(f"  Random (avg>50): Fitness={random_baseline['fitness']:.3f}, TP={random_baseline['tp']}, FP={random_baseline['fp']}, FN={random_baseline['fn']}")
     
     # Comparison
-    print(f"\nCHAMPION vs BASELINES:")
+    print("\nCHAMPION vs BASELINES:")
     improvement_over_false = champion_breakdown['fitness'] - always_false['fitness']
     improvement_over_true = champion_breakdown['fitness'] - always_true['fitness']
     improvement_over_random = champion_breakdown['fitness'] - random_baseline['fitness']
@@ -987,8 +986,8 @@ def print_fitness_comparison(
     )
     
     if not baseline_passed:
-        print(f"\nWARNING: Champion is not better than all baselines!")
-        print(f"   This suggests the evolution may be optimizing a loophole.")
+        print("\nWARNING: Champion is not better than all baselines!")
+        print("   This suggests the evolution may be optimizing a loophole.")
     
     print("=" * 70 + "\n")
     

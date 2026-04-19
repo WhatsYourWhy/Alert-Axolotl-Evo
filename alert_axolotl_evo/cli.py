@@ -55,7 +55,7 @@ def main():
         )
         best_genome = meta_evolver.evolve_configs()
         optimal_config = best_genome.to_config(config)
-        print(f"\nOptimal configuration found:")
+        print("\nOptimal configuration found:")
         print(f"  Population size: {best_genome.pop_size}")
         print(f"  Mutation rate: {best_genome.mutation_rate:.3f}")
         print(f"  Crossover rate: {best_genome.crossover_rate:.3f}")

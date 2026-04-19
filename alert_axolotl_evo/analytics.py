@@ -3,7 +3,7 @@
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from alert_axolotl_evo.persistence import load_checkpoint, load_rule
 
@@ -33,7 +33,7 @@ def analyze_evolution_results(results_dir: Path) -> List[Dict[str, Any]]:
                     "config": data.get("config", {}),
                     "convergence_gen": data.get("generation", 0),
                 })
-        except Exception as e:
+        except Exception:
             continue
     
     # Analyze rule files

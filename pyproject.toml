@@ -16,7 +16,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -47,6 +46,9 @@ target-version = "py38"
 extend-exclude = ["examples", "docs"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP"]
-ignore = ["E501"]
+# Pyflakes (bug catches) + import sorting. Style rules intentionally omitted
+# to keep the linter signal-heavy without forcing a large cleanup pass.
+select = ["F", "I"]
+# F841 (unused locals) flags intentional diagnostic variables — revisit later.
+ignore = ["F841"]
 

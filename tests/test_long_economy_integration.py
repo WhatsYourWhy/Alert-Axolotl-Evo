@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 
+
 def run_long_economy_test():
     print("=== Long Economy Test ===")
     print("Goal: Verify economy promotes, evicts, and maintains budget\n")
@@ -43,7 +44,7 @@ def run_long_economy_test():
     config.data.mock_size = 50
     config.operators.mutation_rate = 0.3  # Moderate mutation for variety
     
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  Library Budget: {evolver.promotion_manager.LIBRARY_BUDGET}")
     print(f"  Min Promo Batch: {evolver.min_promo_batch}")
     print(f"  Warmup Ticks: {evolver.promo_warmup_ticks}")

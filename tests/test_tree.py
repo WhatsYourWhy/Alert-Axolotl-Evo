@@ -1,6 +1,5 @@
 """Tests for tree utilities."""
 
-import pytest
 
 from alert_axolotl_evo.tree import (
     get_subtree_paths,

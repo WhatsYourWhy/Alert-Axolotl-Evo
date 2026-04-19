@@ -1,11 +1,12 @@
 """Tests for promotion module."""
 
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
-from alert_axolotl_evo.promotion import PatternStats, PatternVariant, PromotionManager
+import pytest
+
 from alert_axolotl_evo.compiler import PrimitiveCompiler
 from alert_axolotl_evo.fitness import evaluate
+from alert_axolotl_evo.promotion import PatternStats, PatternVariant, PromotionManager
 
 
 class TestPatternStats:
@@ -223,7 +224,6 @@ class TestPromotionManager:
     
     def test_get_best_variant(self, pm):
         """Test _get_best_variant selects highest lift."""
-        from alert_axolotl_evo.tree import merkle_hash
         
         # Create variants with different lifts
         variant1 = PatternVariant(
@@ -256,7 +256,6 @@ class TestPromotionManager:
     
     def test_get_worst_active(self, pm):
         """Test _get_worst_active returns lowest lift."""
-        from alert_axolotl_evo.tree import merkle_hash
         
         variant1 = PatternVariant(
             family_hash="fam1",
@@ -292,7 +291,6 @@ class TestPromotionManager:
     
     def test_activate_registers_macro(self, pm):
         """Test that _activate registers macro correctly."""
-        from alert_axolotl_evo.tree import merkle_hash
         
         variant = PatternVariant(
             family_hash="abcd1234",
@@ -347,7 +345,6 @@ class TestPromotionManager:
         pm.MIN_SHRUNKEN_LIFT = 1.0  # Lower for testing
         
         # Create multiple high-quality candidates
-        from alert_axolotl_evo.tree import merkle_hash
         
         for i in range(5):
             variant = PatternVariant(

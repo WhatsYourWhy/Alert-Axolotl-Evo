@@ -4,12 +4,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from alert_axolotl_evo.config import Config
-from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 from alert_axolotl_evo.persistence import save_rule
 from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS
+from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 
 
 def test_self_improving_evolver_init():
@@ -139,8 +137,9 @@ def test_auto_register_thresholds():
 def test_pattern_detection_accuracy():
     """Test that pattern detection correctly identifies common combinations."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         from pathlib import Path
+
+        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         
         results_dir = Path(tmpdir)
         
@@ -376,8 +375,9 @@ def test_boundary_large_history():
 def test_boundary_many_files():
     """Test pattern discovery with many files."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         from pathlib import Path
+
+        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         
         results_dir = Path(tmpdir)
         
@@ -489,8 +489,9 @@ def test_performance_pattern_discovery():
     """Test that pattern discovery completes in reasonable time."""
     import time
     with tempfile.TemporaryDirectory() as tmpdir:
-        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         from pathlib import Path
+
+        from alert_axolotl_evo.pattern_discovery import discover_common_patterns
         
         results_dir = Path(tmpdir)
         

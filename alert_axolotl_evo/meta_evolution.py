@@ -3,7 +3,7 @@
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.evolution import evolve

@@ -16,7 +16,7 @@ from alert_axolotl_evo.operators import (
 )
 from alert_axolotl_evo.persistence import load_checkpoint, save_checkpoint, save_rule
 from alert_axolotl_evo.tree import ensure_alert_root, is_valid_alert_rule, node_count
-from alert_axolotl_evo.visualization import announce_birth, log_funeral, print_ascii_tree, generate_name
+from alert_axolotl_evo.visualization import announce_birth, generate_name, log_funeral, print_ascii_tree
 
 
 def select_top_bottom(trees: Sequence[Any], count: int = 3) -> List[Any]:

@@ -1,6 +1,5 @@
 """Tests for compiler module."""
 
-import pytest
 
 from alert_axolotl_evo.compiler import PrimitiveCompiler
 from alert_axolotl_evo.fitness import evaluate

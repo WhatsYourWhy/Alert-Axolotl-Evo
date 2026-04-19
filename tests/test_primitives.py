@@ -1,15 +1,14 @@
 """Tests for primitives module."""
 
-import pytest
 
 from alert_axolotl_evo.primitives import (
-    FUNCTIONS,
     ARITIES,
     FUNCTION_NAMES,
+    FUNCTIONS,
     TERMINALS,
     register_function,
-    unregister_function,
     register_terminal,
+    unregister_function,
 )
 
 

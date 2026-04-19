@@ -1,10 +1,9 @@
 """Tests for fitness evaluation."""
 
-import pytest
 
-from alert_axolotl_evo.fitness import coerce_number, evaluate, fitness, fitness_breakdown
-from alert_axolotl_evo.config import FitnessConfig, DataConfig
+from alert_axolotl_evo.config import DataConfig
 from alert_axolotl_evo.data import MockDataLoader
+from alert_axolotl_evo.fitness import coerce_number, evaluate, fitness, fitness_breakdown
 from alert_axolotl_evo.tree import is_valid_alert_rule
 
 
@@ -531,9 +530,7 @@ class TestFitnessAlignment:
     
     def test_baseline_comparison(self):
         """Test that evolved rules should beat baselines."""
-        from alert_axolotl_evo.fitness import (
-            baseline_always_false, baseline_always_true, baseline_random
-        )
+        from alert_axolotl_evo.fitness import baseline_always_false, baseline_always_true, baseline_random
         
         # A reasonable rule should beat baselines
         good_tree = ("if_alert", (">", ("max", "latency"), 75), "High latency")

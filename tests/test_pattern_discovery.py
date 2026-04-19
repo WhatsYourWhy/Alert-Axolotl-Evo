@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from alert_axolotl_evo.pattern_discovery import (
     discover_structural_patterns,
     extract_subtrees,

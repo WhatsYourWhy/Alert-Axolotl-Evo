@@ -6,10 +6,11 @@ work correctly with the evolution system.
 
 Run with: python test_external_data.py
 """
+from typing import List, Tuple
+
+from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.data import DataLoader
 from alert_axolotl_evo.evolution import evolve
-from alert_axolotl_evo.config import Config
-from typing import List, Tuple
 
 
 class TestExternalDataLoader(DataLoader):

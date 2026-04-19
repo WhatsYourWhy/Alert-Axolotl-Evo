@@ -6,8 +6,6 @@ import csv
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from alert_axolotl_evo.data import CSVDataLoader
 
 

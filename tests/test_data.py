@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from alert_axolotl_evo.config import DataConfig
 from alert_axolotl_evo.data import (
     CSVDataLoader,
     JSONDataLoader,
     MockDataLoader,
     create_data_loader,
 )
-from alert_axolotl_evo.config import Config, DataConfig
 
 
 def test_mock_data_loader():

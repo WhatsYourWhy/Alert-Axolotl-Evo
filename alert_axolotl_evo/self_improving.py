@@ -2,7 +2,7 @@
 
 import json
 import logging
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -13,8 +13,10 @@ from alert_axolotl_evo.analytics import (
     identify_successful_configs,
     track_performance_metrics,
 )
+from alert_axolotl_evo.compiler import PrimitiveCompiler
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.evolution import evolve
+from alert_axolotl_evo.fitness import evaluate
 from alert_axolotl_evo.pattern_discovery import (
     analyze_primitive_usage,
     discover_common_patterns,
@@ -22,17 +24,21 @@ from alert_axolotl_evo.pattern_discovery import (
     identify_optimization_targets,
     suggest_new_primitives,
 )
+from alert_axolotl_evo.persistence import load_rule
+from alert_axolotl_evo.primitives import (
+    FUNCTIONS,
+    TERMINALS,
+    register_function,
+    register_terminal,
+    unregister_function,
+)
+from alert_axolotl_evo.promotion import PromotionManager
 from alert_axolotl_evo.visualization import (
     announce_pattern_discovery,
     display_pattern_leaderboard,
     generate_pattern_name,
     print_pattern_discovery_summary,
 )
-from alert_axolotl_evo.persistence import load_rule
-from alert_axolotl_evo.primitives import FUNCTIONS, TERMINALS, register_function, register_terminal, unregister_function
-from alert_axolotl_evo.compiler import PrimitiveCompiler
-from alert_axolotl_evo.promotion import PromotionManager
-from alert_axolotl_evo.fitness import evaluate
 
 
 class SelfImprovingEvolver:

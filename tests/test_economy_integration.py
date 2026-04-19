@@ -14,7 +14,6 @@ Run with: python test_economy.py
 Note: This creates test artifacts in test_economy_results/ directory.
 """
 import logging
-import sys
 from pathlib import Path
 
 # Configure logging to see the market updates clearly
@@ -22,6 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 from alert_axolotl_evo.config import Config
 from alert_axolotl_evo.self_improving import SelfImprovingEvolver
+
 
 def run_economy_test():
     print("=== Starting Economic Heartbeat Test ===")
@@ -120,8 +120,8 @@ def run_economy_test():
         
         print(f"\nTotal Promoted (all time): {len(evolver.promoted_macros)}")
         print(f"Final Economy Tick: {evolver.economy_tick}")
-        print(f"\n[OK] Economy is 'breathing': Tick advancing monotonically")
-        print(f"[OK] Batch guards working: Processing champions per run")
+        print("\n[OK] Economy is 'breathing': Tick advancing monotonically")
+        print("[OK] Batch guards working: Processing champions per run")
         if len(evolver.promoted_macros) > 0:
             print(f"[OK] Market activity detected: {len(evolver.promoted_macros)} promotions")
         else:

@@ -3,7 +3,7 @@
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from alert_axolotl_evo.persistence import load_rule
 from alert_axolotl_evo.primitives import TERMINALS

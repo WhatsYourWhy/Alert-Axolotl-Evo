@@ -49,6 +49,8 @@ extend-exclude = ["examples", "docs"]
 # Pyflakes (bug catches) + import sorting. Style rules intentionally omitted
 # to keep the linter signal-heavy without forcing a large cleanup pass.
 select = ["F", "I"]
-# F841 (unused locals) flags intentional diagnostic variables — revisit later.
-ignore = ["F841"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files often bind intermediate values for readability/debugging.
+"tests/*" = ["F841"]
 

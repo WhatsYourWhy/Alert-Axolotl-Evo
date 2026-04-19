@@ -408,7 +408,6 @@ class SelfImprovingEvolver:
             
             # Get exact and abstract patterns
             exact_subtrees = patterns.get("exact_subtrees", Counter())
-            abstract_algorithms = patterns.get("abstract_algorithms", Counter())
             hash_to_tree = patterns.get("hash_to_tree", {})
             subtree_metadata = patterns.get("subtree_metadata", {})
             

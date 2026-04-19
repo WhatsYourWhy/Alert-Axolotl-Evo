@@ -225,7 +225,6 @@ def evolve(
         
         # Check evidence validity: breakdown must be computed on same dataset
         # and not hit hard gates (invalid_rate > 0.5, exceptions, etc.)
-        invalid_rate = champion_breakdown.get('invalid_rate', 0.0)
         exception_rate = champion_breakdown.get('exception_rate', 0.0)
         invalid_evaluation = champion_breakdown.get('invalid_evaluation', False)
         

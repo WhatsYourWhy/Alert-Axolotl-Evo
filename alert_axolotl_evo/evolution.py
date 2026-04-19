@@ -71,24 +71,8 @@ def evolve(
     
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     
-    # Create data loader (use provided one or create from config)
     if data_loader is None:
-        try:
-            data_loader = create_data_loader(config.data)
-        except Exception as e:
-            logging.getLogger("evo").warning(f"Failed to create data loader: {e}. Using mock data.")
-            from alert_axolotl_evo.data import MockDataLoader
-            data_loader = MockDataLoader(
-                seed=seed,
-                size=config.data.mock_size,
-                anomaly_count=config.data.anomaly_count,
-                anomaly_multiplier=config.data.anomaly_multiplier,
-                use_realistic_patterns=getattr(config.data, 'use_realistic_patterns', True),
-                base_latency_mean=getattr(config.data, 'base_latency_mean', 50.0),
-                base_latency_std=getattr(config.data, 'base_latency_std', 10.0),
-                trend_strength=getattr(config.data, 'trend_strength', 0.1),
-                noise_level=getattr(config.data, 'noise_level', 0.15),
-            )
+        data_loader = create_data_loader(config.data)
     
     # Load checkpoint if provided
     start_gen = 0

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "alert-axolotl-evo"
 version = "1.0.0"
-description = "A deterministic, gamified genetic programming system for evolving alert rules"
+description = "Deterministic genetic programming for evolving interpretable alert rules"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
@@ -30,7 +30,7 @@ classifiers = [
 yaml = ["pyyaml>=6.0"]
 
 [project.scripts]
-alert-axolotl-evo = "alert_axolotl_evo.main:main"
+alert-axolotl-evo = "alert_axolotl_evo.cli:main"
 
 [tool.setuptools]
 packages = ["alert_axolotl_evo"]
@@ -40,4 +40,13 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py38"
+extend-exclude = ["examples", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
 

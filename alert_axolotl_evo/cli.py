@@ -1,6 +1,7 @@
-"""Entry point with CLI."""
+"""Command-line interface."""
 
 import argparse
+import json
 from pathlib import Path
 
 from alert_axolotl_evo.config import add_config_args, load_config, merge_cli_args
@@ -10,8 +11,7 @@ from alert_axolotl_evo.self_improving import SelfImprovingEvolver
 
 
 def main():
-    """Main entry point."""
-    parser = argparse.ArgumentParser(description="Alert Axolotl Evo: Genetic programming for alert rules")
+    parser = argparse.ArgumentParser(description="Alert-Axolotl-Evo: genetic programming for alert rules")
     parser = add_config_args(parser)
     parser.add_argument("--load-checkpoint", type=Path, help="Path to checkpoint file to resume from")
     parser.add_argument("--save-checkpoint", type=Path, help="Path to save checkpoint file")
@@ -33,7 +33,6 @@ def main():
     if args.performance_report:
         evolver = SelfImprovingEvolver(results_dir=args.results_dir)
         report = evolver.get_performance_report()
-        import json
         print(json.dumps(report, indent=2))
         return
     

@@ -319,7 +319,7 @@ alert_axolotl_evo_legacy.evolve(seed=42)  # Still works!
 
 **New way:** Use config file or CLI arguments
 ```bash
-python -m alert_axolotl_evo.main --config config.yaml
+python -m alert_axolotl_evo --config config.yaml
 ```
 
 #### Data Loading

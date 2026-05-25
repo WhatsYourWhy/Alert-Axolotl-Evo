@@ -17,7 +17,6 @@ def test_built_wheel_includes_fitness_subpackage(tmp_path):
             "pip",
             "wheel",
             "--no-deps",
-            "--no-build-isolation",
             "--wheel-dir",
             str(tmp_path),
             str(PROJECT_ROOT),
@@ -27,7 +26,7 @@ def test_built_wheel_includes_fitness_subpackage(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 0, result.stderr + result.stdout
 
     wheels = list(tmp_path.glob("alert_axolotl_evo-*.whl"))
     assert len(wheels) == 1

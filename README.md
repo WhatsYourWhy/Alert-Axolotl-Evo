@@ -20,7 +20,7 @@ pip install -e .            # core
 pip install -e ".[yaml]"    # with YAML config support
 ```
 
-Requires Python 3.9+.
+Requires Python 3.8+.
 
 ## Quick start
 

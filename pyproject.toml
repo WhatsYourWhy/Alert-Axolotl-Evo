@@ -7,7 +7,7 @@ name = "alert-axolotl-evo"
 version = "1.0.0"
 description = "Deterministic genetic programming for evolving interpretable alert rules"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT"
 authors = [
     {name = "Justin"}
@@ -17,7 +17,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -45,7 +44,7 @@ python_functions = ["test_*"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py38"
+target-version = "py39"
 extend-exclude = ["examples", "docs"]
 
 [tool.ruff.lint]

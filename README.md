@@ -44,6 +44,8 @@ evolve(config=config)
 ```
 
 See [examples/](examples/) for more.
+For checkpoints, meta-evolution, self-improving runs, and the Promotion Manager
+CLI flags, see the [usage guide](docs/usage.md#cli-reference).
 
 ## How it works
 

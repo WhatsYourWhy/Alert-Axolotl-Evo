@@ -2,10 +2,14 @@
 
 ## Quick Start
 
-### Run the Demo
+### Run a Quick Evolution
 
 ```bash
-python demo.py
+# Console script installed by `pip install -e .`
+alert-axolotl-evo --generations 5 --pop-size 20 --export-rule champion.json
+
+# Equivalent programmatic example from a checkout
+python examples/basic.py
 ```
 
 This runs a quick 5-generation evolution with 20 individuals, showcasing:
@@ -13,19 +17,55 @@ This runs a quick 5-generation evolution with 20 individuals, showcasing:
 - Champion battles with fitness scores
 - Funeral logs for culled individuals
 - Evolution progression
-- Final champion export
+- Final champion export to `champion.json`
 
 ### Basic Usage
 
+Use `alert-axolotl-evo` as the canonical CLI after installation. The module
+entrypoint, `python -m alert_axolotl_evo`, reaches the same CLI and is useful
+when running directly from a checkout.
+
 ```bash
 # Run with defaults (40 generations, 50 population)
-python -m alert_axolotl_evo
+alert-axolotl-evo
 
 # Quick test run
-python -m alert_axolotl_evo --generations 5 --pop-size 20
+alert-axolotl-evo --generations 5 --pop-size 20
 
 # Custom seed for reproducibility
-python -m alert_axolotl_evo --seed 123 --generations 10
+alert-axolotl-evo --seed 123 --generations 10
+```
+
+### CLI Reference
+
+The CLI loads a config file first, then applies any CLI flags as overrides. If
+`--config` is omitted, it uses `config.yaml` from the current directory when it
+exists; otherwise it falls back to defaults.
+
+| Area | Flags | Purpose |
+| --- | --- | --- |
+| Config | `--config` | Load YAML or JSON configuration. YAML files require `pip install -e ".[yaml]"`. |
+| Evolution | `--seed`, `--pop-size`, `--generations`, `--min-depth`, `--max-depth` | Control run reproducibility, population size, duration, and tree depth. |
+| Operators | `--crossover-rate`, `--mutation-rate`, `--tournament-size` | Tune selection and genetic operator pressure. |
+| Data | `--data-source {mock,csv,json}`, `--data-path`, `--value-column`, `--anomaly-column` | Select synthetic or file-backed data and map input fields. |
+| Artifacts | `--load-checkpoint`, `--save-checkpoint`, `--export-rule` | Resume/save evolution state and export the final champion rule. |
+| Meta-evolution | `--meta-evolve`, `--meta-generations`, `--meta-pop-size` | Search for a stronger evolution configuration before running standard evolution. |
+| Self-improving mode | `--self-improving`, `--results-dir`, `--performance-report` | Learn from prior runs, persist run history, or print the accumulated performance report. |
+| Promotion Manager | `--enable-promotion-manager`, `--library-budget`, `--min-promo-batch`, `--promo-warmup-ticks` | Enable and constrain economic macro promotion during self-improving runs. |
+
+Examples:
+
+```bash
+# Load config, override the seed, resume from a checkpoint, and export a rule
+alert-axolotl-evo --config config.yaml --seed 123 \
+  --load-checkpoint checkpoint.json --export-rule champion.json
+
+# Run self-improving evolution with the Promotion Manager enabled
+alert-axolotl-evo --self-improving --enable-promotion-manager \
+  --results-dir evolution_results --library-budget 50
+
+# Print the report accumulated in the results directory
+alert-axolotl-evo --performance-report --results-dir evolution_results
 ```
 
 ## Real-World Implementation
@@ -131,7 +171,7 @@ Only adjust if your operational constraints differ from the defaults. For exampl
 - **High-Stakes Monitoring**: May require higher precision (≥50%)
 - **Rare Anomaly Detection**: May need lower recall floor (≥5%)
 
-See [`docs/FITNESS_ALIGNMENT.md`](docs/FITNESS_ALIGNMENT.md) for comprehensive documentation.
+See [`fitness-alignment.md`](fitness-alignment.md) for comprehensive documentation.
 
 ### 4. Self-Improving Evolution with Economic Learning (Promotion Manager)
 
@@ -208,9 +248,9 @@ if "promotion_manager" in report:
 - **Ghost Pruning**: Macros unused for 15+ ticks are retired
 - **Harmful Pruning**: Macros with lift < 0.99 are retired
 
-See `ARCHITECTURE.md` for the complete design contract and economic model.
+See [`architecture.md`](architecture.md) and [`design-contract.md`](design-contract.md) for the complete design contract and economic model.
 
-### 4. Continuous Evolution with Checkpoints
+### 5. Continuous Evolution with Checkpoints
 
 ```python
 from alert_axolotl_evo.evolution import evolve
@@ -234,7 +274,7 @@ evolve(
 )
 ```
 
-### 4. Integration with Monitoring Systems
+### 6. Integration with Monitoring Systems
 
 ```python
 from alert_axolotl_evo.fitness import evaluate
@@ -287,6 +327,14 @@ value,timestamp,is_anomaly
 ```
 
 ## Configuration Examples
+
+YAML config files require the optional YAML dependency:
+
+```bash
+pip install -e ".[yaml]"
+```
+
+JSON config files work with the core install.
 
 ### High-Performance Run
 ```yaml

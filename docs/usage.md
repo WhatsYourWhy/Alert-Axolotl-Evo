@@ -2,10 +2,14 @@
 
 ## Quick Start
 
-### Run the Demo
+### Run a Quick Evolution
 
 ```bash
-python demo.py
+# From a source checkout (ensures imports resolve from repo root)
+python3 -m examples.basic
+
+# Or, after installation
+alert-axolotl-evo --generations 5 --pop-size 20 --export-rule champion.json
 ```
 
 This runs a quick 5-generation evolution with 20 individuals, showcasing:

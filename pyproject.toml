@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-yaml = ["pyyaml>=6.0.3"]
+yaml = ["pyyaml>=6.0.4"]
 
 [project.scripts]
 alert-axolotl-evo = "alert_axolotl_evo.cli:main"
